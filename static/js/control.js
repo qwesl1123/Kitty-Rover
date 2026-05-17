@@ -19,29 +19,64 @@ const stopMic = document.getElementById("stopMic");
 const micAudio = document.getElementById("micAudio");
 const micStatus = document.getElementById("micStatus");
 
-startMic.addEventListener("click", async () => {
+let isListening = false;
+let listenWasActiveBeforeTalk = false;
+let micStopReason = "manual";
+
+async function startRoverMic() {
+  micStopReason = "start";
   micStatus.textContent = "Starting...";
   micAudio.src = "/mic_feed?t=" + Date.now();
 
   try {
     await micAudio.play();
+    isListening = true;
+    micStatus.textContent = "Listening";
   } catch (err) {
+    isListening = false;
+    micAudio.pause();
+    micAudio.removeAttribute("src");
+    micAudio.load();
     micStatus.textContent = "Mic playback error: " + err.message;
   }
-});
+}
 
-stopMic.addEventListener("click", () => {
+function stopRoverMic(reason = "manual") {
+  micStopReason = reason;
   micAudio.pause();
   micAudio.removeAttribute("src");
   micAudio.load();
-  micStatus.textContent = "Stopped";
+  isListening = false;
+  micStatus.textContent = reason === "talk" ? "Paused while talking" : "Stopped";
+}
+
+async function resumeRoverMicIfNeeded() {
+  if (!listenWasActiveBeforeTalk) {
+    return;
+  }
+
+  listenWasActiveBeforeTalk = false;
+  micStatus.textContent = "Resuming listen...";
+  await startRoverMic();
+}
+
+startMic.addEventListener("click", startRoverMic);
+
+stopMic.addEventListener("click", () => {
+  listenWasActiveBeforeTalk = false;
+  stopRoverMic("manual");
 });
 
 micAudio.onerror = () => {
+  if (micStopReason === "talk" || micStopReason === "manual") {
+    return;
+  }
+  isListening = false;
   micStatus.textContent = "Rover mic stream error";
 };
 
 micAudio.onplaying = () => {
+  isListening = true;
   micStatus.textContent = "Listening";
 };
 
@@ -75,16 +110,13 @@ function selectVoiceClipMimeType() {
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
-function cleanupVoiceClip() {
-  if (recordTimer !== null) {
-    clearTimeout(recordTimer);
-    recordTimer = null;
-  }
-
+function stopPhoneMicTracks() {
   if (recordStream) {
     recordStream.getTracks().forEach((track) => track.stop());
   }
+}
 
+function resetVoiceClipState() {
   recorder = null;
   recordStream = null;
   recordChunks = [];
@@ -92,6 +124,22 @@ function cleanupVoiceClip() {
   isRecording = false;
   currentMimeType = "";
   setTalkButtonEnabled(true);
+}
+
+async function cleanupVoiceClip({ resumeListen = false } = {}) {
+  if (recordTimer !== null) {
+    clearTimeout(recordTimer);
+    recordTimer = null;
+  }
+
+  stopPhoneMicTracks();
+  resetVoiceClipState();
+
+  if (resumeListen) {
+    await resumeRoverMicIfNeeded();
+  } else {
+    listenWasActiveBeforeTalk = false;
+  }
 }
 
 async function startVoiceClip() {
@@ -109,13 +157,19 @@ async function startVoiceClip() {
     isRecording = true;
     shouldUploadRecording = true;
     recordChunks = [];
+    listenWasActiveBeforeTalk = isListening;
     setTalkButtonEnabled(false);
+
+    if (isListening) {
+      stopRoverMic("talk");
+    }
+
     talkStatus.textContent = "Recording...";
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (!isRecording || !shouldUploadRecording) {
       stream.getTracks().forEach((track) => track.stop());
-      cleanupVoiceClip();
+      await cleanupVoiceClip({ resumeListen: true });
       return;
     }
 
@@ -147,7 +201,7 @@ async function startVoiceClip() {
       if (!uploadAllowed) {
         console.log("upload skipped because canceled");
         talkStatus.textContent = "Recording canceled";
-        cleanupVoiceClip();
+        await cleanupVoiceClip({ resumeListen: true });
         return;
       }
 
@@ -169,11 +223,24 @@ async function startVoiceClip() {
         });
 
         console.log("upload complete");
-        talkStatus.textContent = res.ok ? "Played on rover speaker" : "Failed to play audio";
+        if (res.ok) {
+          talkStatus.textContent = "Played on rover speaker";
+        } else {
+          let errorMessage = "Failed to play audio";
+          try {
+            const data = await res.json();
+            if (data.error) {
+              errorMessage += ": " + data.error;
+            }
+          } catch (err) {
+            console.log("failed to parse play_audio error response", err);
+          }
+          talkStatus.textContent = errorMessage;
+        }
       } catch (err) {
         talkStatus.textContent = "Failed to play audio: " + err.message;
       } finally {
-        cleanupVoiceClip();
+        await cleanupVoiceClip({ resumeListen: true });
       }
     };
 
@@ -186,7 +253,7 @@ async function startVoiceClip() {
     }, 3000);
   } catch (err) {
     talkStatus.textContent = "Mic error: " + err.message;
-    cleanupVoiceClip();
+    await cleanupVoiceClip({ resumeListen: true });
   }
 }
 
@@ -202,7 +269,7 @@ function finishVoiceClip() {
     recorder.stop();
   } catch (err) {
     talkStatus.textContent = "Failed to stop recording: " + err.message;
-    cleanupVoiceClip();
+    cleanupVoiceClip({ resumeListen: true });
   }
 }
 
@@ -220,10 +287,10 @@ function cancelVoiceClip(reason) {
       recorder.stop();
     } catch (err) {
       console.log("recorder stop failed during cancel", err);
-      cleanupVoiceClip();
+      cleanupVoiceClip({ resumeListen: true });
     }
   } else {
-    cleanupVoiceClip();
+    cleanupVoiceClip({ resumeListen: true });
   }
 }
 

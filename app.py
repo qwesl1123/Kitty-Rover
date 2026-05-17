@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
 MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 
 def emit_drive_status(status=None):
@@ -59,7 +59,12 @@ def play_audio():
     if len(audio) > MAX_AUDIO_UPLOAD_BYTES:
         return jsonify({"ok": False, "error": "audio upload too large"}), 413
 
-    play_audio_file(audio)
+    try:
+        play_audio_file(audio)
+    except Exception as err:
+        app.logger.exception("[audio] playback failed to start")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
     return jsonify({"ok": True})
 
 
