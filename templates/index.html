@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Rover Control</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <section class="panel">
+        <h2>Camera</h2>
+
+        <button id="startCam">Start Camera</button>
+        <button id="stopCam">Stop Camera</button>
+
+        <div class="videoBox">
+            <img id="video" alt="Camera stream not active">
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Audio</h2>
+
+        <button id="startMic">Listen to Rover Mic</button>
+        <button id="stopMic">Stop Listening</button>
+
+        <audio id="micAudio" controls></audio>
+
+        <hr>
+
+        <button id="talkBtn">Record 3s Voice Clip</button>
+        <p id="talkStatus">Idle</p>
+    </section>
+
+    <div class="drivePad">
+        <button class="driveBtn forward" data-left="180" data-right="180">▲</button>
+        <button class="driveBtn left" data-left="-120" data-right="120">◀</button>
+        <button class="driveBtn back" data-left="-160" data-right="-160">▼</button>
+        <button class="driveBtn right" data-left="120" data-right="-120">▶</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/static/js/control.js"></script>
+</body>
+
+</html>
