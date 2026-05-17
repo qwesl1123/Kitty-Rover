@@ -17,59 +17,220 @@ stopCam.addEventListener("click", () => {
 const startMic = document.getElementById("startMic");
 const stopMic = document.getElementById("stopMic");
 const micAudio = document.getElementById("micAudio");
+const micStatus = document.getElementById("micStatus");
 
-startMic.addEventListener("click", () => {
+startMic.addEventListener("click", async () => {
+  micStatus.textContent = "Starting...";
   micAudio.src = "/mic_feed?t=" + Date.now();
-  micAudio.play();
+
+  try {
+    await micAudio.play();
+  } catch (err) {
+    micStatus.textContent = "Mic playback error: " + err.message;
+  }
 });
 
 stopMic.addEventListener("click", () => {
   micAudio.pause();
   micAudio.removeAttribute("src");
   micAudio.load();
+  micStatus.textContent = "Stopped";
 });
+
+micAudio.onerror = () => {
+  micStatus.textContent = "Rover mic stream error";
+};
+
+micAudio.onplaying = () => {
+  micStatus.textContent = "Listening";
+};
 
 const talkBtn = document.getElementById("talkBtn");
 const talkStatus = document.getElementById("talkStatus");
 
 let recorder = null;
-let chunks = [];
+let recordStream = null;
+let recordChunks = [];
+let recordTimer = null;
+let shouldUploadRecording = false;
+let isRecording = false;
+let currentMimeType = "";
 
-talkBtn.addEventListener("click", async () => {
+function setTalkButtonEnabled(enabled) {
+  talkBtn.disabled = !enabled;
+}
+
+function selectVoiceClipMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+  ];
+
+  if (!window.MediaRecorder) {
+    return "";
+  }
+
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function cleanupVoiceClip() {
+  if (recordTimer !== null) {
+    clearTimeout(recordTimer);
+    recordTimer = null;
+  }
+
+  if (recordStream) {
+    recordStream.getTracks().forEach((track) => track.stop());
+  }
+
+  recorder = null;
+  recordStream = null;
+  recordChunks = [];
+  shouldUploadRecording = false;
+  isRecording = false;
+  currentMimeType = "";
+  setTalkButtonEnabled(true);
+}
+
+async function startVoiceClip() {
+  if (isRecording) {
+    console.log("Recording already in progress");
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    talkStatus.textContent = "Mic error: browser recording is not supported";
+    return;
+  }
+
   try {
-    talkStatus.textContent = "Recording 3 seconds...";
+    isRecording = true;
+    shouldUploadRecording = true;
+    recordChunks = [];
+    setTalkButtonEnabled(false);
+    talkStatus.textContent = "Recording...";
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!isRecording || !shouldUploadRecording) {
+      stream.getTracks().forEach((track) => track.stop());
+      cleanupVoiceClip();
+      return;
+    }
 
-    recorder = new MediaRecorder(stream);
-    chunks = [];
+    recordStream = stream;
+    currentMimeType = selectVoiceClipMimeType();
+    const options = currentMimeType ? { mimeType: currentMimeType } : undefined;
+    recorder = new MediaRecorder(recordStream, options);
 
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
+    const activeRecorder = recorder;
+    const uploadMimeType = currentMimeType || activeRecorder.mimeType || "application/octet-stream";
+
+    activeRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        recordChunks.push(event.data);
+      }
     };
 
-    recorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: recorder.mimeType });
-      const buffer = await blob.arrayBuffer();
-
-      talkStatus.textContent = "Sending...";
-
-      const res = await fetch("/play_audio", {
-        method: "POST",
-        headers: { "Content-Type": recorder.mimeType },
-        body: buffer
-      });
-
-      stream.getTracks().forEach(track => track.stop());
-      talkStatus.textContent = res.ok ? "Played on rover speaker" : "Failed to play audio";
+    activeRecorder.onerror = (event) => {
+      const message = event.error?.message || "unknown recorder error";
+      talkStatus.textContent = "Mic error: " + message;
+      cancelVoiceClip("recorder error");
     };
 
-    recorder.start();
-    setTimeout(() => recorder.stop(), 3000);
+    activeRecorder.onstop = async () => {
+      console.log("recorder stopped");
+      const uploadAllowed = shouldUploadRecording;
+      const chunksToUpload = recordChunks.slice();
+
+      if (!uploadAllowed) {
+        console.log("upload skipped because canceled");
+        talkStatus.textContent = "Recording canceled";
+        cleanupVoiceClip();
+        return;
+      }
+
+      try {
+        if (chunksToUpload.length === 0) {
+          throw new Error("no recorded audio data");
+        }
+
+        const blob = new Blob(chunksToUpload, { type: uploadMimeType });
+        const buffer = await blob.arrayBuffer();
+
+        talkStatus.textContent = "Sending...";
+        console.log("upload starting");
+
+        const res = await fetch("/play_audio", {
+          method: "POST",
+          headers: { "Content-Type": uploadMimeType },
+          body: buffer,
+        });
+
+        console.log("upload complete");
+        talkStatus.textContent = res.ok ? "Played on rover speaker" : "Failed to play audio";
+      } catch (err) {
+        talkStatus.textContent = "Failed to play audio: " + err.message;
+      } finally {
+        cleanupVoiceClip();
+      }
+    };
+
+    activeRecorder.start(250);
+    console.log("recording started");
+
+    recordTimer = setTimeout(() => {
+      console.log("timer finished");
+      finishVoiceClip();
+    }, 3000);
   } catch (err) {
     talkStatus.textContent = "Mic error: " + err.message;
+    cleanupVoiceClip();
   }
-});
+}
+
+function finishVoiceClip() {
+  if (!recorder || recorder.state !== "recording") {
+    return;
+  }
+
+  try {
+    if (typeof recorder.requestData === "function") {
+      recorder.requestData();
+    }
+    recorder.stop();
+  } catch (err) {
+    talkStatus.textContent = "Failed to stop recording: " + err.message;
+    cleanupVoiceClip();
+  }
+}
+
+function cancelVoiceClip(reason) {
+  if (!isRecording && !recorder) {
+    return;
+  }
+
+  console.log("recording canceled", reason);
+  talkStatus.textContent = "Recording canceled";
+  shouldUploadRecording = false;
+
+  if (recorder && recorder.state === "recording") {
+    try {
+      recorder.stop();
+    } catch (err) {
+      console.log("recorder stop failed during cancel", err);
+      cleanupVoiceClip();
+    }
+  } else {
+    cleanupVoiceClip();
+  }
+}
+
+talkBtn.addEventListener("click", startVoiceClip);
+
+window.addEventListener("pagehide", () => cancelVoiceClip("pagehide"));
+window.addEventListener("beforeunload", () => cancelVoiceClip("beforeunload"));
 
 // Drive controls
 const driveLeft = document.getElementById("driveLeft");
@@ -145,6 +306,7 @@ window.addEventListener("blur", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    cancelVoiceClip("visibility hidden");
     stopAllDriveButtons();
     sendStop();
   }

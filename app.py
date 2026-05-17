@@ -7,6 +7,7 @@ from rover.drive import drive, get_drive_status, set_status_callback, start_watc
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
+MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -47,10 +48,16 @@ def status():
 
 @app.route("/play_audio", methods=["POST"])
 def play_audio():
+    if request.content_length and request.content_length > MAX_AUDIO_UPLOAD_BYTES:
+        return jsonify({"ok": False, "error": "audio upload too large"}), 413
+
     audio = request.get_data()
 
     if not audio:
         return jsonify({"ok": False, "error": "no audio received"}), 400
+
+    if len(audio) > MAX_AUDIO_UPLOAD_BYTES:
+        return jsonify({"ok": False, "error": "audio upload too large"}), 413
 
     play_audio_file(audio)
     return jsonify({"ok": True})
