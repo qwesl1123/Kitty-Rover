@@ -71,7 +71,23 @@ talkBtn.addEventListener("click", async () => {
   }
 });
 
-// Fake drive controls
+// Drive controls
+const driveLeft = document.getElementById("driveLeft");
+const driveRight = document.getElementById("driveRight");
+const emergencyStop = document.getElementById("emergencyStop");
+const DRIVE_REPEAT_MS = 200;
+
+let driveRepeatTimer = null;
+
+function updateDriveStatus(status) {
+  if (!status) return;
+
+  driveLeft.textContent = status.left;
+  driveRight.textContent = status.right;
+}
+
+socket.on("drive_status", updateDriveStatus);
+
 function sendDrive(left, right) {
   socket.emit("drive", { left, right });
 }
@@ -80,20 +96,36 @@ function sendStop() {
   socket.emit("stop");
 }
 
+function clearDriveRepeat() {
+  if (driveRepeatTimer !== null) {
+    clearInterval(driveRepeatTimer);
+    driveRepeatTimer = null;
+  }
+}
+
+function stopAllDriveButtons() {
+  clearDriveRepeat();
+  document.querySelectorAll(".driveBtn.active").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+}
+
 document.querySelectorAll(".driveBtn").forEach((btn) => {
   const left = parseInt(btn.dataset.left, 10);
   const right = parseInt(btn.dataset.right, 10);
 
   btn.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    stopAllDriveButtons();
     btn.setPointerCapture(event.pointerId);
     sendDrive(left, right);
+    driveRepeatTimer = setInterval(() => sendDrive(left, right), DRIVE_REPEAT_MS);
     btn.classList.add("active");
   });
 
   const stopHandler = () => {
+    stopAllDriveButtons();
     sendStop();
-    btn.classList.remove("active");
   };
 
   btn.addEventListener("pointerup", stopHandler);
@@ -101,7 +133,19 @@ document.querySelectorAll(".driveBtn").forEach((btn) => {
   btn.addEventListener("pointerleave", stopHandler);
 });
 
-window.addEventListener("blur", sendStop);
+emergencyStop.addEventListener("click", () => {
+  stopAllDriveButtons();
+  socket.emit("emergency_stop");
+});
+
+window.addEventListener("blur", () => {
+  stopAllDriveButtons();
+  sendStop();
+});
+
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) sendStop();
+  if (document.hidden) {
+    stopAllDriveButtons();
+    sendStop();
+  }
 });

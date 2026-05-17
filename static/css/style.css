@@ -88,3 +88,24 @@ audio {
   grid-column: 2;
   grid-row: 3;
 }
+.driveStatusPanel {
+  padding-bottom: 20px;
+}
+
+.emergencyStop {
+  display: inline-block;
+  width: 100%;
+  max-width: 360px;
+  border: 2px solid #ff9a9a;
+  border-radius: 12px;
+  background: #b00020;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.emergencyStop:active {
+  background: #750015;
+  transform: scale(0.98);
+}

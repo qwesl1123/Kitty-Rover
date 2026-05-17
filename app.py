@@ -3,12 +3,20 @@ from flask_socketio import SocketIO
 
 from rover.camera import camera
 from rover.audio import mic_stream, play_audio_file
-from rover.drive import drive, stop
+from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
 
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+
+def emit_drive_status(status=None):
+    socketio.emit("drive_status", status or get_drive_status())
+
+
+set_status_callback(emit_drive_status)
+start_watchdog(socketio.start_background_task, socketio.sleep)
 
 
 @app.route("/")
@@ -32,6 +40,11 @@ def mic_feed():
     )
 
 
+@app.route("/status")
+def status():
+    return jsonify({"ok": True, "drive": get_drive_status()})
+
+
 @app.route("/play_audio", methods=["POST"])
 def play_audio():
     audio = request.get_data()
@@ -53,6 +66,16 @@ def handle_drive(data):
 @socketio.on("stop")
 def handle_stop():
     stop()
+
+
+@socketio.on("emergency_stop")
+def handle_emergency_stop():
+    stop()
+
+
+@socketio.on("connect")
+def handle_connect():
+    emit_drive_status()
 
 
 @socketio.on("disconnect")
