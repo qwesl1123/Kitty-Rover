@@ -109,3 +109,17 @@ audio {
   background: #750015;
   transform: scale(0.98);
 }
+
+.statusMessage {
+  color: #bbb;
+  min-height: 1.4em;
+}
+
+.statusMessage.error {
+  color: #ff9a9a;
+}
+
+.systemPanel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

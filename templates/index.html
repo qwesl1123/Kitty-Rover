@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <title>Rover Control</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=p2-system-20260518">
 </head>
 
 <body>
@@ -34,6 +34,30 @@
         <p id="talkStatus">Idle</p>
     </section>
 
+    <section class="panel systemPanel">
+        <h2>System</h2>
+
+        <p>
+            Battery:
+            <strong id="batteryPercent">
+                {{ system_status.battery.capacity_percent if system_status.battery.capacity_percent is not none else "Unknown" }}{% if system_status.battery.capacity_percent is not none %}%{% endif %}
+            </strong>
+            <span id="batteryStatus">({{ system_status.battery.status or "unknown" }})</span>
+        </p>
+        <p>
+            CPU Temp:
+            <strong id="cpuTemp">
+                {{ "%.1f"|format(system_status.cpu_temp.celsius) if system_status.cpu_temp.celsius is not none else "Unknown" }}{% if system_status.cpu_temp.celsius is not none %} °C{% endif %}
+            </strong>
+        </p>
+        <p id="systemStatusMessage" class="statusMessage">Initial status loaded from server; live refresh starting...</p>
+
+        <button id="refreshSystemStatus">Refresh Status</button>
+        <button id="screenOff">Screen Off</button>
+        <button id="screenOn">Screen On</button>
+        <button id="keyboardDisable" disabled title="Later after SSH recovery is confirmed">Keyboard disable: later after SSH recovery is confirmed.</button>
+    </section>
+
     <section class="panel driveStatusPanel">
         <h2>Drive</h2>
         <p>Left: <strong id="driveLeft">0</strong> | Right: <strong id="driveRight">0</strong></p>
@@ -48,7 +72,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="/static/js/control.js"></script>
+    <script src="{{ url_for('static', filename='js/control.js') }}?v=p2-system-20260518"></script>
 </body>
 
 </html>

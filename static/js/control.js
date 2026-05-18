@@ -1,4 +1,8 @@
-const socket = io();
+const socket = typeof io === "function" ? io() : null;
+
+if (!socket) {
+  console.warn("Socket.IO client is unavailable; drive controls are disabled, but system controls will keep working.");
+}
 
 // Camera
 const video = document.getElementById("video");
@@ -314,13 +318,17 @@ function updateDriveStatus(status) {
   driveRight.textContent = status.right;
 }
 
-socket.on("drive_status", updateDriveStatus);
+if (socket) {
+  socket.on("drive_status", updateDriveStatus);
+}
 
 function sendDrive(left, right) {
+  if (!socket) return;
   socket.emit("drive", { left, right });
 }
 
 function sendStop() {
+  if (!socket) return;
   socket.emit("stop");
 }
 
@@ -363,7 +371,9 @@ document.querySelectorAll(".driveBtn").forEach((btn) => {
 
 emergencyStop.addEventListener("click", () => {
   stopAllDriveButtons();
-  socket.emit("emergency_stop");
+  if (socket) {
+    socket.emit("emergency_stop");
+  }
 });
 
 window.addEventListener("blur", () => {
@@ -378,3 +388,84 @@ document.addEventListener("visibilitychange", () => {
     sendStop();
   }
 });
+
+// System appliance controls
+const batteryPercent = document.getElementById("batteryPercent");
+const batteryStatus = document.getElementById("batteryStatus");
+const cpuTemp = document.getElementById("cpuTemp");
+const systemStatusMessage = document.getElementById("systemStatusMessage");
+const refreshSystemStatus = document.getElementById("refreshSystemStatus");
+const screenOff = document.getElementById("screenOff");
+const screenOn = document.getElementById("screenOn");
+const SYSTEM_REFRESH_MS = 10000;
+
+function setSystemMessage(message, isError = false) {
+  systemStatusMessage.textContent = message;
+  systemStatusMessage.classList.toggle("error", isError);
+}
+
+function formatBattery(battery) {
+  if (!battery || battery.capacity_percent === null || battery.capacity_percent === undefined) {
+    batteryPercent.textContent = "Unknown";
+  } else {
+    batteryPercent.textContent = battery.capacity_percent + "%";
+  }
+
+  batteryStatus.textContent = battery && battery.status ? "(" + battery.status + ")" : "(unknown)";
+}
+
+function formatCpuTemp(temp) {
+  if (!temp || temp.celsius === null || temp.celsius === undefined) {
+    cpuTemp.textContent = "Unknown";
+    return;
+  }
+
+  cpuTemp.textContent = temp.celsius.toFixed(1) + " °C";
+}
+
+async function fetchJsonOrThrow(url, options = {}) {
+  const response = await fetch(url, options);
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new Error("Invalid JSON response from " + url);
+  }
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Request failed with HTTP " + response.status);
+  }
+
+  return data;
+}
+
+async function refreshSystemStatusNow() {
+  try {
+    setSystemMessage("Refreshing system status...");
+    const data = await fetchJsonOrThrow("/system/status");
+    formatBattery(data.battery);
+    formatCpuTemp(data.cpu_temp);
+    setSystemMessage("System status updated " + new Date().toLocaleTimeString());
+  } catch (err) {
+    setSystemMessage("System status error: " + err.message, true);
+  }
+}
+
+async function postScreenControl(url, actionName) {
+  try {
+    setSystemMessage(actionName + "...");
+    await fetchJsonOrThrow(url, { method: "POST" });
+    setSystemMessage(actionName + " succeeded");
+    await refreshSystemStatusNow();
+  } catch (err) {
+    setSystemMessage(actionName + " failed: " + err.message, true);
+  }
+}
+
+refreshSystemStatus.addEventListener("click", refreshSystemStatusNow);
+screenOff.addEventListener("click", () => postScreenControl("/system/screen_off", "Screen off"));
+screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", "Screen on"));
+
+refreshSystemStatusNow();
+setInterval(refreshSystemStatusNow, SYSTEM_REFRESH_MS);

@@ -4,6 +4,7 @@ from flask_socketio import SocketIO
 from rover.camera import camera
 from rover.audio import mic_stream, play_audio_file
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
+from rover.system_control import get_system_status, screen_off, screen_on
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
@@ -22,7 +23,7 @@ start_watchdog(socketio.start_background_task, socketio.sleep)
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("index.html", system_status=get_system_status())
 
 
 @app.route("/video_feed")
@@ -44,6 +45,23 @@ def mic_feed():
 @app.route("/status")
 def status():
     return jsonify({"ok": True, "drive": get_drive_status()})
+
+
+@app.route("/system/status")
+def system_status():
+    return jsonify(get_system_status())
+
+
+@app.route("/system/screen_off", methods=["POST"])
+def system_screen_off():
+    result = screen_off()
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+@app.route("/system/screen_on", methods=["POST"])
+def system_screen_on():
+    result = screen_on()
+    return jsonify(result), 200 if result.get("ok") else 500
 
 
 @app.route("/play_audio", methods=["POST"])
