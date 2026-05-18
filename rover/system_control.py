@@ -90,7 +90,7 @@ def _run_screen_script(script_path: Path) -> dict[str, Any]:
 
     try:
         completed = subprocess.run(
-            ["bash", str(script_path)],
+            ["sudo", "-n", str(script_path)],
             check=False,
             capture_output=True,
             text=True,
