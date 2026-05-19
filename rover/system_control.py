@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import socket
 import time
 from pathlib import Path
 from typing import Any
@@ -140,6 +141,86 @@ def get_resource_status() -> dict[str, Any]:
     return resource_status
 
 
+def get_network_status() -> dict[str, Any]:
+    """Return hostname and network interface details for rover connectivity checks."""
+    hostname = socket.gethostname()
+    interfaces: list[dict[str, Any]] = []
+    lan_ipv4: list[str] = []
+    tailscale_ipv4: str | None = None
+    tailscale_available = False
+    errors: list[str] = []
+
+    try:
+        net_addrs = psutil.net_if_addrs()
+        net_stats = psutil.net_if_stats()
+    except (psutil.Error, OSError, ValueError, TypeError) as err:
+        return {
+            "hostname": hostname,
+            "interfaces": [],
+            "lan_ipv4": [],
+            "tailscale_ipv4": None,
+            "tailscale_available": False,
+            "error": f"network introspection failed: {err}",
+        }
+
+    for interface_name, interface_addresses in net_addrs.items():
+        ipv4_addresses: list[str] = []
+        for addr in interface_addresses:
+            if addr.family == socket.AF_INET and addr.address:
+                ipv4_addresses.append(addr.address)
+
+        is_up = bool(net_stats.get(interface_name).isup) if interface_name in net_stats else False
+        interfaces.append(
+            {
+                "name": interface_name,
+                "ipv4": ipv4_addresses,
+                "is_up": is_up,
+            }
+        )
+
+        if interface_name == "tailscale0" and ipv4_addresses:
+            tailscale_ipv4 = ipv4_addresses[0]
+            tailscale_available = True
+
+        for ip in ipv4_addresses:
+            if ip != "127.0.0.1":
+                lan_ipv4.append(ip)
+
+    if tailscale_ipv4 and tailscale_ipv4 in lan_ipv4:
+        lan_ipv4 = [ip for ip in lan_ipv4 if ip != tailscale_ipv4]
+
+    if not tailscale_ipv4:
+        try:
+            completed = subprocess.run(
+                ["tailscale", "ip", "-4"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if completed.returncode == 0:
+                parsed_lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+                if parsed_lines:
+                    tailscale_ipv4 = parsed_lines[0]
+                    tailscale_available = True
+                    if tailscale_ipv4 in lan_ipv4:
+                        lan_ipv4 = [ip for ip in lan_ipv4 if ip != tailscale_ipv4]
+            else:
+                tailscale_available = False
+        except (subprocess.TimeoutExpired, OSError) as err:
+            errors.append(f"tailscale command unavailable: {err}")
+
+    network_status: dict[str, Any] = {
+        "hostname": hostname,
+        "interfaces": interfaces,
+        "lan_ipv4": lan_ipv4,
+        "tailscale_ipv4": tailscale_ipv4,
+        "tailscale_available": tailscale_available,
+        "error": "; ".join(errors) if errors else None,
+    }
+    return network_status
+
+
 def _run_screen_script(script_path: Path) -> dict[str, Any]:
     """Run a screen control script and return a JSON-safe result."""
     if not script_path.exists():
@@ -203,4 +284,5 @@ def get_system_status() -> dict[str, Any]:
         "battery": get_battery_status(),
         "cpu_temp": get_cpu_temp(),
         "resources": get_resource_status(),
+        "network": get_network_status(),
     }

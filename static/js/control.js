@@ -646,6 +646,10 @@ const cpuUsage = document.getElementById("cpuUsage");
 const ramUsage = document.getElementById("ramUsage");
 const diskUsage = document.getElementById("diskUsage");
 const uptime = document.getElementById("uptime");
+const hostnameValue = document.getElementById("hostnameValue");
+const lanIpValue = document.getElementById("lanIpValue");
+const tailscaleIpValue = document.getElementById("tailscaleIpValue");
+const interfacesValue = document.getElementById("interfacesValue");
 const systemStatusMessage = document.getElementById("systemStatusMessage");
 const refreshSystemStatus = document.getElementById("refreshSystemStatus");
 const screenOff = document.getElementById("screenOff");
@@ -699,6 +703,36 @@ function formatResources(resources) {
   uptime.textContent = resources.uptime_human || "Unknown";
 }
 
+function formatNetwork(network) {
+  if (!network) {
+    hostnameValue.textContent = "Unknown";
+    lanIpValue.textContent = "Unknown";
+    tailscaleIpValue.textContent = "Unknown";
+    interfacesValue.textContent = "Unknown";
+    return;
+  }
+
+  hostnameValue.textContent = network.hostname || "Unknown";
+  lanIpValue.textContent = Array.isArray(network.lan_ipv4) && network.lan_ipv4.length > 0
+    ? network.lan_ipv4.join(", ")
+    : "Unknown";
+  tailscaleIpValue.textContent = network.tailscale_available && network.tailscale_ipv4
+    ? network.tailscale_ipv4
+    : "Unavailable";
+
+  const compactInterfaces = Array.isArray(network.interfaces)
+    ? network.interfaces
+      .filter((iface) => iface && iface.is_up)
+      .map((iface) => {
+        const name = iface.name || "unknown";
+        const ipv4 = Array.isArray(iface.ipv4) && iface.ipv4.length > 0 ? iface.ipv4.join(", ") : "no IPv4";
+        return `${name}: ${ipv4}`;
+      })
+    : [];
+
+  interfacesValue.textContent = compactInterfaces.length > 0 ? compactInterfaces.join("; ") : "Unknown";
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
@@ -723,6 +757,7 @@ async function refreshSystemStatusNow() {
     formatBattery(data.battery);
     formatCpuTemp(data.cpu_temp);
     formatResources(data.resources);
+    formatNetwork(data.network);
     setSystemMessage("System status updated " + new Date().toLocaleTimeString());
   } catch (err) {
     setSystemMessage("System status error: " + err.message, true);
