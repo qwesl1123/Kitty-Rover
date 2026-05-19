@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
+
+import psutil
 
 BATTERY_PATH = Path("/sys/class/power_supply/BAT0")
 CPU_TEMP_PATH = Path("/sys/class/thermal/thermal_zone0/temp")
@@ -74,6 +77,69 @@ def get_cpu_temp() -> dict[str, Any]:
     }
 
 
+def _format_uptime(seconds: float | int | None) -> str:
+    """Format uptime like '4m', '2h 13m', or '1d 3h 20m'."""
+    if seconds is None:
+        return "Unknown"
+
+    total_seconds = max(0, int(seconds))
+    minutes = total_seconds // 60
+    hours = minutes // 60
+    days = hours // 24
+
+    if days > 0:
+        remaining_hours = hours % 24
+        remaining_minutes = minutes % 60
+        return f"{days}d {remaining_hours}h {remaining_minutes}m"
+
+    if hours > 0:
+        remaining_minutes = minutes % 60
+        return f"{hours}h {remaining_minutes}m"
+
+    return f"{minutes}m"
+
+
+def get_resource_status() -> dict[str, Any]:
+    """Return CPU/RAM/disk/uptime safely for the system status panel."""
+    cpu_percent: float | None = None
+    ram_percent: float | None = None
+    disk_percent: float | None = None
+    uptime_seconds: float | None = None
+    errors: list[str] = []
+
+    try:
+        cpu_percent = round(float(psutil.cpu_percent(interval=None)), 1)
+    except (psutil.Error, OSError, ValueError, TypeError) as err:
+        errors.append(f"cpu: {err}")
+
+    try:
+        ram_percent = round(float(psutil.virtual_memory().percent), 1)
+    except (psutil.Error, OSError, ValueError, TypeError) as err:
+        errors.append(f"ram: {err}")
+
+    try:
+        disk_percent = round(float(psutil.disk_usage('/').percent), 1)
+    except (psutil.Error, OSError, ValueError, TypeError) as err:
+        errors.append(f"disk: {err}")
+
+    try:
+        uptime_seconds = round(float(time.time() - psutil.boot_time()), 1)
+    except (psutil.Error, OSError, ValueError, TypeError) as err:
+        errors.append(f"uptime: {err}")
+
+    resource_status: dict[str, Any] = {
+        "cpu_percent": cpu_percent,
+        "ram_percent": ram_percent,
+        "disk_percent": disk_percent,
+        "uptime_seconds": uptime_seconds,
+        "uptime_human": _format_uptime(uptime_seconds),
+    }
+    if errors:
+        resource_status["error"] = "; ".join(errors)
+
+    return resource_status
+
+
 def _run_screen_script(script_path: Path) -> dict[str, Any]:
     """Run a screen control script and return a JSON-safe result."""
     if not script_path.exists():
@@ -136,4 +202,5 @@ def get_system_status() -> dict[str, Any]:
         "ok": True,
         "battery": get_battery_status(),
         "cpu_temp": get_cpu_temp(),
+        "resources": get_resource_status(),
     }

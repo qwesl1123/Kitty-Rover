@@ -63,6 +63,22 @@
                 {{ "%.1f"|format(system_status.cpu_temp.celsius) if system_status.cpu_temp.celsius is not none else "Unknown" }}{% if system_status.cpu_temp.celsius is not none %} °C{% endif %}
             </strong>
         </p>
+        <p>
+            CPU Usage:
+            <strong id="cpuUsage">Unknown</strong>
+        </p>
+        <p>
+            RAM Usage:
+            <strong id="ramUsage">Unknown</strong>
+        </p>
+        <p>
+            Disk Usage:
+            <strong id="diskUsage">Unknown</strong>
+        </p>
+        <p>
+            Uptime:
+            <strong id="uptime">Unknown</strong>
+        </p>
         <p id="systemStatusMessage" class="statusMessage">Initial status loaded from server; live refresh starting...</p>
 
         <button id="refreshSystemStatus">Refresh Status</button>

@@ -642,6 +642,10 @@ document.addEventListener("visibilitychange", () => {
 const batteryPercent = document.getElementById("batteryPercent");
 const batteryStatus = document.getElementById("batteryStatus");
 const cpuTemp = document.getElementById("cpuTemp");
+const cpuUsage = document.getElementById("cpuUsage");
+const ramUsage = document.getElementById("ramUsage");
+const diskUsage = document.getElementById("diskUsage");
+const uptime = document.getElementById("uptime");
 const systemStatusMessage = document.getElementById("systemStatusMessage");
 const refreshSystemStatus = document.getElementById("refreshSystemStatus");
 const screenOff = document.getElementById("screenOff");
@@ -672,6 +676,29 @@ function formatCpuTemp(temp) {
   cpuTemp.textContent = temp.celsius.toFixed(1) + " °C";
 }
 
+function formatPercentValue(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "Unknown";
+  }
+
+  return Number(value).toFixed(1) + "%";
+}
+
+function formatResources(resources) {
+  if (!resources) {
+    cpuUsage.textContent = "Unknown";
+    ramUsage.textContent = "Unknown";
+    diskUsage.textContent = "Unknown";
+    uptime.textContent = "Unknown";
+    return;
+  }
+
+  cpuUsage.textContent = formatPercentValue(resources.cpu_percent);
+  ramUsage.textContent = formatPercentValue(resources.ram_percent);
+  diskUsage.textContent = formatPercentValue(resources.disk_percent);
+  uptime.textContent = resources.uptime_human || "Unknown";
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
@@ -695,6 +722,7 @@ async function refreshSystemStatusNow() {
     const data = await fetchJsonOrThrow("/system/status");
     formatBattery(data.battery);
     formatCpuTemp(data.cpu_temp);
+    formatResources(data.resources);
     setSystemMessage("System status updated " + new Date().toLocaleTimeString());
   } catch (err) {
     setSystemMessage("System status error: " + err.message, true);
