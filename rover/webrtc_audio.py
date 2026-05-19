@@ -14,14 +14,56 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription
+import numpy as np
+from aiortc import MediaStreamTrack, RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer, MediaRecorder
+from av import AudioFrame
 
 
 os.environ.setdefault("ALSA_CONFIG_PATH", "/usr/share/alsa/alsa.conf")
 
 MIC_DEVICE = "plughw:0,0"
 SPEAKER_DEVICE = "plughw:0,0"
+
+INCOMING_TALK_GAIN = 3.5
+
+
+class GainAudioTrack(MediaStreamTrack):
+    """Applies bounded int16 gain to inbound talk audio before speaker playback."""
+
+    kind = "audio"
+
+    def __init__(self, source_track: MediaStreamTrack, gain: float) -> None:
+        super().__init__()
+        self._source_track = source_track
+        self._gain = gain
+        self._logged_processing_error = False
+        _log(f"incoming talk gain set to {gain:.1f}x")
+
+    async def recv(self):
+        frame = await self._source_track.recv()
+
+        try:
+            frame_array = frame.to_ndarray()
+            boosted = np.clip(
+                frame_array.astype(np.float32) * self._gain,
+                -32768,
+                32767,
+            ).astype(np.int16)
+
+            out = AudioFrame.from_ndarray(
+                boosted, format="s16", layout=frame.layout.name)
+            out.sample_rate = frame.sample_rate
+            out.pts = frame.pts
+            out.time_base = frame.time_base
+            return out
+        except Exception as err:  # frame-safe fallback to keep WebRTC alive
+            if not self._logged_processing_error:
+                _log(
+                    f"gain processing fallback to original frame: {err}", error=True)
+                self._logged_processing_error = True
+            return frame
+
 
 _LOOP = asyncio.new_event_loop()
 _PEERS: Dict[str, "AudioPeer"] = {}
@@ -126,7 +168,8 @@ async def _start_speaker_playback(peer: AudioPeer, track) -> None:
             format="alsa",
             options={"channels": "1", "sample_rate": "48000"},
         )
-        recorder.addTrack(track)
+        boosted_track = GainAudioTrack(track, gain=INCOMING_TALK_GAIN)
+        recorder.addTrack(boosted_track)
         peer.recorder = recorder
         await recorder.start()
         peer.recorder_started = True
