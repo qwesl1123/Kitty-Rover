@@ -20,7 +20,7 @@
     </section>
 
     <section class="panel">
-        <h2>Audio</h2>
+        <h2>Fallback Audio</h2>
 
         <button id="startMic">Listen to Rover Mic</button>
         <button id="stopMic">Stop Listening</button>
@@ -33,6 +33,19 @@
         <button id="talkBtn">Record 3s Voice Clip</button>
         <p id="talkStatus">Idle</p>
     </section>
+
+    <section class="panel realtimeAudioPanel">
+        <h2>Realtime Audio</h2>
+
+        <button id="webrtcConnect">Connect Realtime Audio</button>
+        <button id="webrtcDisconnect" disabled>Disconnect Realtime Audio</button>
+        <button id="webrtcListenToggle" disabled>Listen ON</button>
+        <button id="webrtcTalkToggle" disabled>Talk ON</button>
+
+        <p id="webrtcStatus" class="statusMessage">Disconnected</p>
+        <audio id="webrtcRemoteAudio" autoplay playsinline controls></audio>
+    </section>
+
 
     <section class="panel systemPanel">
         <h2>System</h2>
@@ -72,7 +85,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/control.js') }}?v=p2-system-20260518"></script>
+    <script src="{{ url_for('static', filename='js/control.js') }}?v=p5-webrtc-audio-20260518"></script>
 </body>
 
 </html>

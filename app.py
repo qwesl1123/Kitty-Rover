@@ -3,6 +3,7 @@ from flask_socketio import SocketIO
 
 from rover.camera import camera
 from rover.audio import mic_stream, play_audio_file
+from rover.webrtc_audio import close_audio_peer_sync, get_audio_status, handle_audio_offer_sync
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
 from rover.system_control import get_system_status, screen_off, screen_on
 
@@ -40,6 +41,42 @@ def mic_feed():
         mic_stream(),
         mimetype="audio/mpeg",
     )
+
+
+@app.route("/webrtc/audio/offer", methods=["POST"])
+def webrtc_audio_offer():
+    offer_json = request.get_json(silent=True)
+    if not offer_json:
+        return jsonify({"ok": False, "error": "missing JSON SDP offer"}), 400
+
+    try:
+        answer = handle_audio_offer_sync(offer_json)
+    except Exception as err:
+        app.logger.exception("[webrtc-audio] failed to handle SDP offer")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    return jsonify(answer)
+
+
+@app.route("/webrtc/audio/close", methods=["POST"])
+def webrtc_audio_close():
+    data = request.get_json(silent=True) or {}
+    peer_id = data.get("peer_id")
+    if not peer_id:
+        return jsonify({"ok": False, "error": "missing peer_id"}), 400
+
+    try:
+        result = close_audio_peer_sync(peer_id)
+    except Exception as err:
+        app.logger.exception("[webrtc-audio] failed to close peer")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    return jsonify(result)
+
+
+@app.route("/webrtc/audio/status")
+def webrtc_audio_status():
+    return jsonify(get_audio_status())
 
 
 @app.route("/status")

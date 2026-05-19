@@ -303,6 +303,255 @@ talkBtn.addEventListener("click", startVoiceClip);
 window.addEventListener("pagehide", () => cancelVoiceClip("pagehide"));
 window.addEventListener("beforeunload", () => cancelVoiceClip("beforeunload"));
 
+
+// Realtime WebRTC audio
+const webrtcConnect = document.getElementById("webrtcConnect");
+const webrtcDisconnect = document.getElementById("webrtcDisconnect");
+const webrtcListenToggle = document.getElementById("webrtcListenToggle");
+const webrtcTalkToggle = document.getElementById("webrtcTalkToggle");
+const webrtcStatus = document.getElementById("webrtcStatus");
+const webrtcRemoteAudio = document.getElementById("webrtcRemoteAudio");
+
+let webrtcPc = null;
+let webrtcLocalStream = null;
+let webrtcRemoteStream = null;
+let webrtcPeerId = null;
+let webrtcTalkEnabled = false;
+let webrtcListenEnabled = false;
+let webrtcConnecting = false;
+
+function setWebrtcStatus(message, isError = false) {
+  webrtcStatus.textContent = message;
+  webrtcStatus.classList.toggle("error", isError);
+}
+
+function updateWebrtcButtons() {
+  const connected = Boolean(webrtcPc) && !webrtcConnecting;
+  webrtcConnect.disabled = webrtcConnecting || connected;
+  webrtcDisconnect.disabled = !webrtcConnecting && !connected;
+  webrtcListenToggle.disabled = !connected;
+  webrtcTalkToggle.disabled = !connected || !webrtcLocalStream;
+  webrtcListenToggle.textContent = webrtcListenEnabled ? "Listen ON" : "Listen OFF";
+  webrtcTalkToggle.textContent = webrtcTalkEnabled ? "Talk ON" : "Talk OFF";
+}
+
+function stopWebrtcLocalTracks() {
+  if (webrtcLocalStream) {
+    webrtcLocalStream.getTracks().forEach((track) => track.stop());
+  }
+  webrtcLocalStream = null;
+}
+
+function waitForIceGatheringComplete(pc) {
+  if (pc.iceGatheringState === "complete") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pc.removeEventListener("icegatheringstatechange", onStateChange);
+      resolve();
+    }, 3000);
+
+    const onStateChange = () => {
+      if (pc.iceGatheringState === "complete") {
+        clearTimeout(timeout);
+        pc.removeEventListener("icegatheringstatechange", onStateChange);
+        resolve();
+      }
+    };
+    pc.addEventListener("icegatheringstatechange", onStateChange);
+  });
+}
+
+async function closeWebrtcAudio({ notifyServer = true, statusMessage = "Disconnected" } = {}) {
+  const peerIdToClose = webrtcPeerId;
+  const pcToClose = webrtcPc;
+
+  webrtcPc = null;
+  webrtcPeerId = null;
+  webrtcConnecting = false;
+  webrtcTalkEnabled = false;
+  webrtcListenEnabled = false;
+
+  stopWebrtcLocalTracks();
+
+  if (pcToClose) {
+    pcToClose.ontrack = null;
+    pcToClose.onconnectionstatechange = null;
+    pcToClose.oniceconnectionstatechange = null;
+    pcToClose.close();
+  }
+
+  if (webrtcRemoteAudio) {
+    webrtcRemoteAudio.pause();
+    webrtcRemoteAudio.srcObject = null;
+    webrtcRemoteAudio.muted = false;
+  }
+  webrtcRemoteStream = null;
+
+  updateWebrtcButtons();
+  setWebrtcStatus(statusMessage);
+
+  if (notifyServer && peerIdToClose) {
+    try {
+      await fetch("/webrtc/audio/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ peer_id: peerIdToClose }),
+        keepalive: true,
+      });
+    } catch (err) {
+      console.log("WebRTC server close notification failed", err);
+    }
+  }
+}
+
+function setWebrtcTalk(enabled) {
+  webrtcTalkEnabled = enabled;
+  if (webrtcLocalStream) {
+    webrtcLocalStream.getAudioTracks().forEach((track) => {
+      track.enabled = enabled;
+    });
+  }
+  updateWebrtcButtons();
+  setWebrtcStatus(enabled ? "Talk ON" : "Talk OFF");
+}
+
+async function setWebrtcListen(enabled) {
+  webrtcListenEnabled = enabled;
+  if (webrtcRemoteAudio) {
+    webrtcRemoteAudio.muted = !enabled;
+    if (enabled) {
+      try {
+        await webrtcRemoteAudio.play();
+      } catch (err) {
+        setWebrtcStatus("WebRTC error: " + err.message, true);
+        webrtcListenEnabled = false;
+      }
+    } else {
+      webrtcRemoteAudio.pause();
+    }
+  }
+  updateWebrtcButtons();
+  if (!webrtcStatus.classList.contains("error")) {
+    setWebrtcStatus(enabled ? "Listen ON" : "Listen OFF");
+  }
+}
+
+async function connectWebrtcAudio() {
+  if (webrtcPc || webrtcConnecting) {
+    return;
+  }
+
+  if (!window.RTCPeerConnection || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setWebrtcStatus("WebRTC error: browser realtime audio is not supported", true);
+    return;
+  }
+
+  webrtcConnecting = true;
+  setWebrtcStatus("Connecting...");
+  updateWebrtcButtons();
+
+  try {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    webrtcPc = pc;
+    webrtcRemoteStream = new MediaStream();
+    webrtcRemoteAudio.srcObject = webrtcRemoteStream;
+    webrtcRemoteAudio.muted = false;
+
+    pc.ontrack = (event) => {
+      event.streams[0]?.getAudioTracks().forEach((track) => webrtcRemoteStream.addTrack(track));
+      if (!event.streams[0]) {
+        webrtcRemoteStream.addTrack(event.track);
+      }
+      if (webrtcListenEnabled) {
+        webrtcRemoteAudio.play().catch((err) => {
+          setWebrtcStatus("WebRTC error: " + err.message, true);
+        });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("WebRTC connection state", pc.connectionState);
+      if (pc.connectionState === "connected") {
+        setWebrtcStatus("Connected");
+      } else if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+        closeWebrtcAudio({ notifyServer: false, statusMessage: "Disconnected" });
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("WebRTC ICE state", pc.iceConnectionState);
+    };
+
+    webrtcLocalStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    webrtcLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    webrtcLocalStream.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+      pc.addTrack(track, webrtcLocalStream);
+    });
+    webrtcTalkEnabled = false;
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(pc);
+
+    const response = await fetch("/webrtc/audio/offer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(pc.localDescription),
+    });
+
+    let answer = null;
+    try {
+      answer = await response.json();
+    } catch (err) {
+      throw new Error("invalid JSON answer from rover");
+    }
+
+    if (!response.ok || answer.ok === false) {
+      throw new Error(answer.error || "rover rejected WebRTC offer");
+    }
+
+    webrtcPeerId = answer.peer_id || null;
+    await pc.setRemoteDescription(answer);
+
+    webrtcConnecting = false;
+    webrtcListenEnabled = true;
+    updateWebrtcButtons();
+    setWebrtcStatus("Connected");
+    await setWebrtcListen(true);
+    setWebrtcTalk(false);
+  } catch (err) {
+    await closeWebrtcAudio({ notifyServer: Boolean(webrtcPeerId), statusMessage: "WebRTC error: " + err.message });
+    webrtcStatus.classList.add("error");
+  }
+}
+
+webrtcConnect.addEventListener("click", connectWebrtcAudio);
+webrtcDisconnect.addEventListener("click", () => closeWebrtcAudio({ statusMessage: "Disconnected" }));
+webrtcTalkToggle.addEventListener("click", () => setWebrtcTalk(!webrtcTalkEnabled));
+webrtcListenToggle.addEventListener("click", () => setWebrtcListen(!webrtcListenEnabled));
+
+window.addEventListener("pagehide", () => {
+  closeWebrtcAudio({ statusMessage: "Disconnected" });
+});
+window.addEventListener("beforeunload", () => {
+  closeWebrtcAudio({ statusMessage: "Disconnected" });
+});
+
+updateWebrtcButtons();
+
 // Drive controls
 const driveLeft = document.getElementById("driveLeft");
 const driveRight = document.getElementById("driveRight");

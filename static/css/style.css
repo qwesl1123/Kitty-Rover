@@ -123,3 +123,7 @@ audio {
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.realtimeAudioPanel audio {
+  max-width: 360px;
+}
