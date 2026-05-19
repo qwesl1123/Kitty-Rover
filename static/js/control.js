@@ -6,15 +6,14 @@ if (!socket) {
 
 // Camera
 const video = document.getElementById("video");
-const startCam = document.getElementById("startCam");
-const stopCam = document.getElementById("stopCam");
+const camToggle = document.getElementById("camToggle");
 
-startCam.addEventListener("click", () => {
-  video.src = "/video_feed?t=" + Date.now();
-});
-
-stopCam.addEventListener("click", () => {
-  video.removeAttribute("src");
+camToggle.addEventListener("click", () => {
+  if (video.hasAttribute("src")) {
+    video.removeAttribute("src");
+  } else {
+    video.src = "/video_feed?t=" + Date.now();
+  }
 });
 
 // Audio
@@ -319,6 +318,8 @@ let webrtcPeerId = null;
 let webrtcTalkEnabled = false;
 let webrtcListenEnabled = false;
 let webrtcConnecting = false;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 function setWebrtcStatus(message, isError = false) {
   webrtcStatus.textContent = message;
@@ -327,10 +328,11 @@ function setWebrtcStatus(message, isError = false) {
 
 function updateWebrtcButtons() {
   const connected = Boolean(webrtcPc) && !webrtcConnecting;
+  const hasLocalAudioTrack = Boolean(webrtcLocalStream?.getAudioTracks()?.length);
   webrtcConnect.disabled = webrtcConnecting || connected;
   webrtcDisconnect.disabled = !webrtcConnecting && !connected;
   webrtcListenToggle.disabled = !connected;
-  webrtcTalkToggle.disabled = !connected || !webrtcLocalStream;
+  webrtcTalkToggle.disabled = !connected || (!hasLocalAudioTrack && !isIOS);
   webrtcListenToggle.textContent = webrtcListenEnabled ? "Listen ON" : "Listen OFF";
   webrtcTalkToggle.textContent = webrtcTalkEnabled ? "Talk ON" : "Talk OFF";
 }
@@ -407,7 +409,145 @@ async function closeWebrtcAudio({ notifyServer = true, statusMessage = "Disconne
   }
 }
 
-function setWebrtcTalk(enabled) {
+async function sendWebrtcOffer(pc) {
+  const response = await fetch("/webrtc/audio/offer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pc.localDescription),
+  });
+
+  let answer = null;
+  try {
+    answer = await response.json();
+  } catch (err) {
+    throw new Error("invalid JSON answer from rover");
+  }
+
+  if (!response.ok || answer.ok === false) {
+    throw new Error(answer.error || "rover rejected WebRTC offer");
+  }
+
+  webrtcPeerId = answer.peer_id || webrtcPeerId || null;
+  await pc.setRemoteDescription(answer);
+}
+
+async function createWebrtcPeer({ includeMic = false, micStream = null, iosListenOnly = false } = {}) {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  });
+
+  webrtcPc = pc;
+  webrtcRemoteStream = new MediaStream();
+  webrtcRemoteAudio.srcObject = webrtcRemoteStream;
+  webrtcRemoteAudio.muted = false;
+
+  pc.ontrack = (event) => {
+    event.streams[0]?.getAudioTracks().forEach((track) => webrtcRemoteStream.addTrack(track));
+    if (!event.streams[0]) {
+      webrtcRemoteStream.addTrack(event.track);
+    }
+    if (webrtcListenEnabled) {
+      webrtcRemoteAudio.play().catch((err) => {
+        setWebrtcStatus("WebRTC error: " + err.message, true);
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log("WebRTC connection state", pc.connectionState);
+    if (pc.connectionState === "connected") {
+      setWebrtcStatus("Connected");
+    } else if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+      closeWebrtcAudio({ notifyServer: false, statusMessage: "Disconnected" });
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log("WebRTC ICE state", pc.iceConnectionState);
+  };
+
+  if (iosListenOnly) {
+    pc.addTransceiver("audio", { direction: "recvonly" });
+    webrtcTalkEnabled = false;
+  }
+
+  if (includeMic) {
+    const stream = micStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+    const micTrack = stream.getAudioTracks()[0];
+    if (!micTrack) {
+      throw new Error("microphone did not provide an audio track");
+    }
+    webrtcLocalStream = stream;
+    if (!isIOS) {
+      micTrack.enabled = false;
+    }
+    pc.addTrack(micTrack, stream);
+  }
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForIceGatheringComplete(pc);
+  await sendWebrtcOffer(pc);
+
+  return pc;
+}
+
+async function enableWebrtcTalkIOS() {
+  setWebrtcStatus("Requesting iPhone microphone...");
+  const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const micTrack = micStream.getAudioTracks()[0];
+  if (!micTrack) {
+    throw new Error("iPhone microphone did not provide an audio track");
+  }
+
+  await closeWebrtcAudio({ notifyServer: true, statusMessage: "Reconnecting with iPhone microphone..." });
+
+  webrtcConnecting = true;
+  updateWebrtcButtons();
+  webrtcListenEnabled = true;
+  await createWebrtcPeer({ includeMic: true, micStream });
+  webrtcConnecting = false;
+  webrtcTalkEnabled = true;
+  updateWebrtcButtons();
+  await setWebrtcListen(true);
+  setWebrtcStatus("iPhone microphone active");
+}
+
+async function disableWebrtcTalkIOS() {
+  await closeWebrtcAudio({ notifyServer: true, statusMessage: "iPhone microphone stopped" });
+
+  webrtcConnecting = true;
+  updateWebrtcButtons();
+  setWebrtcStatus("Reconnecting listen-only...");
+  await createWebrtcPeer({ iosListenOnly: true });
+  webrtcConnecting = false;
+  webrtcListenEnabled = true;
+  webrtcTalkEnabled = false;
+  updateWebrtcButtons();
+  await setWebrtcListen(true);
+  setWebrtcStatus("iPhone microphone stopped");
+}
+
+async function setWebrtcTalk(enabled) {
+  if (!webrtcPc) {
+    return;
+  }
+
+  if (isIOS) {
+    try {
+      if (enabled) {
+        await enableWebrtcTalkIOS();
+      } else {
+        await disableWebrtcTalkIOS();
+      }
+    } catch (err) {
+      webrtcTalkEnabled = false;
+      updateWebrtcButtons();
+      setWebrtcStatus("iPhone microphone error: " + err.message, true);
+    }
+    return;
+  }
+
   webrtcTalkEnabled = enabled;
   if (webrtcLocalStream) {
     webrtcLocalStream.getAudioTracks().forEach((track) => {
@@ -454,84 +594,22 @@ async function connectWebrtcAudio() {
   updateWebrtcButtons();
 
   try {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-    webrtcPc = pc;
-    webrtcRemoteStream = new MediaStream();
-    webrtcRemoteAudio.srcObject = webrtcRemoteStream;
-    webrtcRemoteAudio.muted = false;
-
-    pc.ontrack = (event) => {
-      event.streams[0]?.getAudioTracks().forEach((track) => webrtcRemoteStream.addTrack(track));
-      if (!event.streams[0]) {
-        webrtcRemoteStream.addTrack(event.track);
-      }
-      if (webrtcListenEnabled) {
-        webrtcRemoteAudio.play().catch((err) => {
-          setWebrtcStatus("WebRTC error: " + err.message, true);
-        });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("WebRTC connection state", pc.connectionState);
-      if (pc.connectionState === "connected") {
-        setWebrtcStatus("Connected");
-      } else if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
-        closeWebrtcAudio({ notifyServer: false, statusMessage: "Disconnected" });
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log("WebRTC ICE state", pc.iceConnectionState);
-    };
-
-    webrtcLocalStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-
-    webrtcLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    webrtcLocalStream.getAudioTracks().forEach((track) => {
-      track.enabled = false;
-      pc.addTrack(track, webrtcLocalStream);
-    });
-    webrtcTalkEnabled = false;
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitForIceGatheringComplete(pc);
-
-    const response = await fetch("/webrtc/audio/offer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pc.localDescription),
-    });
-
-    let answer = null;
-    try {
-      answer = await response.json();
-    } catch (err) {
-      throw new Error("invalid JSON answer from rover");
+    if (isIOS) {
+      await createWebrtcPeer({ iosListenOnly: true });
+      webrtcTalkEnabled = false;
+    } else {
+      await createWebrtcPeer({ includeMic: true });
+      webrtcTalkEnabled = false;
     }
-
-    if (!response.ok || answer.ok === false) {
-      throw new Error(answer.error || "rover rejected WebRTC offer");
-    }
-
-    webrtcPeerId = answer.peer_id || null;
-    await pc.setRemoteDescription(answer);
 
     webrtcConnecting = false;
     webrtcListenEnabled = true;
     updateWebrtcButtons();
-    setWebrtcStatus("Connected");
+    setWebrtcStatus(isIOS ? "Connected (iOS mode: tap Talk ON to start microphone)" : "Connected");
     await setWebrtcListen(true);
-    setWebrtcTalk(false);
+    if (!isIOS) {
+      await setWebrtcTalk(false);
+    }
   } catch (err) {
     await closeWebrtcAudio({ notifyServer: Boolean(webrtcPeerId), statusMessage: "WebRTC error: " + err.message });
     webrtcStatus.classList.add("error");
@@ -540,7 +618,7 @@ async function connectWebrtcAudio() {
 
 webrtcConnect.addEventListener("click", connectWebrtcAudio);
 webrtcDisconnect.addEventListener("click", () => closeWebrtcAudio({ statusMessage: "Disconnected" }));
-webrtcTalkToggle.addEventListener("click", () => setWebrtcTalk(!webrtcTalkEnabled));
+webrtcTalkToggle.addEventListener("click", async () => setWebrtcTalk(!webrtcTalkEnabled));
 webrtcListenToggle.addEventListener("click", () => setWebrtcListen(!webrtcListenEnabled));
 
 window.addEventListener("pagehide", () => {

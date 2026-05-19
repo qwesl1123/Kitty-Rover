@@ -3,19 +3,34 @@
 
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Rover Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=p2-system-20260518">
 </head>
 
 <body>
-    <section class="panel">
-        <h2>Camera</h2>
+    <section class="cameraSection">
+        <header class="cameraHeader">
+            <h2 class="sectionLabel">Camera</h2>
+            <span class="liveBadge" aria-live="polite">
+                <span class="liveDot" aria-hidden="true"></span>
+                <span class="liveLabel liveLabel--off">Offline</span>
+                <span class="liveLabel liveLabel--on">Live</span>
+            </span>
+        </header>
 
-        <button id="startCam">Start Camera</button>
-        <button id="stopCam">Stop Camera</button>
+        <div class="cameraStage">
+            <img id="video" alt="Rover camera">
+        </div>
 
-        <div class="videoBox">
-            <img id="video" alt="Camera stream not active">
+        <div class="cameraControls">
+            <button id="camToggle" class="camToggleBtn">
+                <span class="camToggleBtn__label camToggleBtn__label--start">Start Camera</span>
+                <span class="camToggleBtn__label camToggleBtn__label--stop">Stop Camera</span>
+            </button>
         </div>
     </section>
 

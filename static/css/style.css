@@ -1,9 +1,45 @@
+/* =========================================================
+   Design tokens (Phase 1 — used by camera section; future
+   phases will migrate other panels onto these tokens).
+   ========================================================= */
+:root {
+  --bg-0: #0a0a0b;        /* deepest, video stage */
+  --bg-1: #111114;        /* base surface */
+  --bg-2: #18181b;        /* elevated surface */
+  --bg-3: #1f1f23;        /* hover surface */
+
+  --border-1: #27272a;    /* hairline */
+  --border-2: #3f3f46;    /* control border */
+  --border-3: #52525b;    /* hover border */
+
+  --text-0: #fafafa;      /* primary */
+  --text-1: #a1a1aa;      /* secondary */
+  --text-2: #71717a;      /* muted */
+  --text-3: #52525b;      /* placeholder */
+
+  --signal-live: #10b981;   /* green: connected/live */
+  --signal-warn: #f59e0b;   /* amber: caution */
+  --signal-stop: #ef4444;   /* red: stop/danger */
+  --signal-info: #38bdf8;   /* cyan: neutral signal */
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+}
+
+/* =========================================================
+   Body (untouched layout — only Phase 1 sets stage for full-
+   bleed children via overflow control).
+   ========================================================= */
 body {
   font-family: system-ui, sans-serif;
   background: #111;
   color: #eee;
   margin: 24px;
   min-height: 100vh;
+  overflow-x: hidden; /* contain full-bleed camera section */
 }
 
 .panel {
@@ -20,16 +56,6 @@ button {
   cursor: pointer;
 }
 
-.videoBox {
-  margin-top: 16px;
-  background: #000;
-  width: 640px;
-  min-height: 480px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 img {
   max-width: 100%;
 }
@@ -39,6 +65,219 @@ audio {
   margin-top: 12px;
   width: 100%;
 }
+
+/* =========================================================
+   CAMERA SECTION  (Phase 1 — full bleed mobile, Frigate vibe)
+   ========================================================= */
+.cameraSection {
+  /* full-bleed escape from body's 24px margin */
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  margin-top: -24px;      /* eat the top body margin so video pins to top */
+  margin-bottom: 24px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.cameraHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  background: var(--bg-1);
+}
+
+.sectionLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-1);
+  margin: 0;
+  line-height: 1;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px 5px 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-1);
+  line-height: 1;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  background: var(--text-3);
+  border-radius: 50%;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.liveLabel--on { display: none; }
+.liveLabel--off { display: inline; }
+
+/* Stage: black canvas, 4:3, edge-to-edge on mobile */
+.cameraStage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-0);
+  overflow: hidden;
+  border-top: 1px solid var(--border-1);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.cameraStage::before {
+  content: "NO SIGNAL";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--text-3);
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(255, 255, 255, 0.012) 3px,
+      rgba(255, 255, 255, 0.012) 4px
+    );
+}
+
+.cameraStage #video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.cameraControls {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  background: var(--bg-1);
+}
+
+.camToggleBtn {
+  flex: 1;
+  margin: 0;
+  padding: 14px 16px;
+  min-height: 48px;
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Default (offline) — green-tinted START affordance */
+.camToggleBtn:hover {
+  border-color: var(--signal-live);
+  color: var(--signal-live);
+}
+.camToggleBtn:active {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: var(--signal-live);
+  color: var(--signal-live);
+}
+
+/* Live — red-tinted STOP affordance (state-driven by #video[src]) */
+.cameraSection:has(#video[src]) .camToggleBtn {
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+}
+.cameraSection:has(#video[src]) .camToggleBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+}
+.cameraSection:has(#video[src]) .camToggleBtn:active {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+/* ---------- State-driven label swap ---------- */
+.camToggleBtn__label--stop { display: none; }
+.cameraSection:has(#video[src]) .camToggleBtn__label--start { display: none; }
+.cameraSection:has(#video[src]) .camToggleBtn__label--stop { display: inline; }
+
+/* Hide the NO SIGNAL overlay + show img only when live */
+.cameraSection:has(#video[src]) .cameraStage::before { display: none; }
+.cameraSection:not(:has(#video[src])) #video { visibility: hidden; }
+
+/* Live badge swap */
+.cameraSection:has(#video[src]) .liveLabel--off { display: none; }
+.cameraSection:has(#video[src]) .liveLabel--on { display: inline; }
+.cameraSection:has(#video[src]) .liveLabel--on { color: var(--signal-live); }
+.cameraSection:has(#video[src]) .liveDot {
+  background: var(--signal-live);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  animation: liveDotPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+  }
+}
+
+/* ---------- Desktop layout ---------- */
+@media (min-width: 760px) {
+  .cameraSection {
+    width: auto;
+    position: static;
+    left: auto;
+    margin: 0 0 24px;
+    max-width: 960px;
+    border: 1px solid var(--border-1);
+    border-bottom: 1px solid var(--border-1);
+  }
+
+  .cameraStage {
+    border-left: none;
+    border-right: none;
+  }
+
+  .cameraControls {
+    justify-content: flex-start;
+  }
+
+  .camToggleBtn {
+    flex: 0 0 auto;
+    min-width: 200px;
+  }
+}
+
+/* =========================================================
+   Untouched legacy styles below — Phase 2+ will refactor.
+   ========================================================= */
 
 .drivePad {
   position: fixed;
