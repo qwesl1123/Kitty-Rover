@@ -630,6 +630,24 @@ body[data-system-warnings="1"] .systemBar__warn {
   transition: width 0.3s ease, background 0.2s ease;
 }
 
+/* Lightning bolt — shown only when charging, centered over the fill */
+.batteryIcon__bolt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 9px;
+  color: #fff;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: none;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
+body[data-battery-charging="yes"] .batteryIcon__bolt {
+  display: block;
+}
+
 body[data-battery-level="low"] .batteryIcon__fill { background: var(--signal-stop); }
 body[data-battery-level="med"] .batteryIcon__fill { background: var(--signal-warn); }
 body[data-battery-level="ok"] .batteryIcon__fill  { background: var(--signal-live); }
@@ -882,8 +900,17 @@ html:has(.systemSheetToggle:checked) body {
   border-radius: 14px;
   background: #222;
   color: #eee;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   user-select: none;
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .driveBtn.active {

@@ -843,6 +843,10 @@ function applySystemWarnings(data) {
   }
   document.body.dataset.batteryLevel = batteryLevel;
 
+  const isCharging = battery && typeof battery.status === "string"
+    && battery.status.toLowerCase() === "charging";
+  document.body.dataset.batteryCharging = isCharging ? "yes" : "no";
+
   const pillPercent = document.getElementById("batteryPercentPill");
   if (pillPercent) {
     pillPercent.textContent = batteryPct !== null ? batteryPct + "%" : "--";
@@ -855,12 +859,13 @@ function applySystemWarnings(data) {
 
   // --- Per-row warnings ---
   const rowWarnings = {
+    battery: batteryLevel === "low",
     cpuTemp: cpuTempData && typeof cpuTempData.celsius === "number" && cpuTempData.celsius > 80,
     ramUsage: resources && typeof resources.ram_percent === "number" && resources.ram_percent > 90,
     diskUsage: resources && typeof resources.disk_percent === "number" && resources.disk_percent > 90,
   };
 
-  let anyWarning = batteryLevel === "low";
+  let anyWarning = false;
   for (const [stat, warn] of Object.entries(rowWarnings)) {
     const row = document.querySelector(`[data-stat="${stat}"]`);
     if (row) {
