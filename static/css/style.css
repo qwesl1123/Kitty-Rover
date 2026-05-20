@@ -67,7 +67,8 @@ audio {
 }
 
 /* =========================================================
-   CAMERA SECTION  (Phase 1 — full bleed mobile, Frigate vibe)
+   CAMERA SECTION  (Phase 2 — camera + realtime audio fused)
+   Full bleed on mobile, constrained on desktop.
    ========================================================= */
 .cameraSection {
   /* full-bleed escape from body's 24px margin */
@@ -76,60 +77,119 @@ audio {
   left: 50%;
   margin-left: -50vw;
   margin-right: -50vw;
-  margin-top: -24px;      /* eat the top body margin so video pins to top */
+  margin-top: -24px;
   margin-bottom: 24px;
   background: var(--bg-1);
   border-bottom: 1px solid var(--border-1);
+  font-family: var(--sans);
+}
+
+/* Visually hidden but kept for screen readers */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .cameraHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
+  padding: 10px 14px 8px;
   background: var(--bg-1);
 }
 
-.sectionLabel {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-1);
-  margin: 0;
-  line-height: 1;
-}
-
-.liveBadge {
+/* ---- Status bar (camera + audio status, left-aligned, compact) ---- */
+.statusBar {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 9px 5px 8px;
+  align-items: stretch;
+  gap: 0;
   background: var(--bg-2);
   border: 1px solid var(--border-1);
   border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 24px;
+}
+
+.statusBar__divider {
+  width: 1px;
+  background: var(--border-1);
+  align-self: stretch;
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-1);
   line-height: 1;
 }
 
-.liveDot {
-  width: 6px;
-  height: 6px;
+.statusItem__icon {
+  width: 11px;
+  height: 11px;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.statusItem__dot {
+  width: 5px;
+  height: 5px;
   background: var(--text-3);
   border-radius: 50%;
+  flex-shrink: 0;
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
-.liveLabel--on { display: none; }
-.liveLabel--off { display: inline; }
+.statusItem__label { white-space: nowrap; }
 
-/* Stage: black canvas, 4:3, edge-to-edge on mobile */
+/* ---- Status: camera state (driven by #video[src]) ---- */
+.statusItem__label--camOn { display: none; }
+.statusItem__label--camOff { display: inline; }
+.cameraSection:has(#video[src]) .statusItem__label--camOff { display: none; }
+.cameraSection:has(#video[src]) .statusItem__label--camOn { display: inline; color: var(--signal-live); }
+.cameraSection:has(#video[src]) .statusItem--camera .statusItem__icon { color: var(--signal-live); }
+.cameraSection:has(#video[src]) .statusItem--camera .statusItem__dot {
+  background: var(--signal-live);
+  animation: liveDotPulse 1.8s ease-in-out infinite;
+}
+
+/* ---- Status: audio state (driven by data-audio-state) ---- */
+.statusItem__label--audioConnecting,
+.statusItem__label--audioOn { display: none; }
+.statusItem__label--audioOff { display: inline; }
+
+.cameraSection[data-audio-state="connecting"] .statusItem__label--audioOff,
+.cameraSection[data-audio-state="connected"] .statusItem__label--audioOff { display: none; }
+.cameraSection[data-audio-state="connecting"] .statusItem__label--audioConnecting { display: inline; color: var(--signal-warn); }
+.cameraSection[data-audio-state="connected"] .statusItem__label--audioOn { display: inline; color: var(--signal-live); }
+
+.cameraSection[data-audio-state="connecting"] .statusItem--audio .statusItem__icon { color: var(--signal-warn); }
+.cameraSection[data-audio-state="connecting"] .statusItem--audio .statusItem__dot {
+  background: var(--signal-warn);
+  animation: liveDotPulse 1.2s ease-in-out infinite;
+}
+.cameraSection[data-audio-state="connected"] .statusItem--audio .statusItem__icon { color: var(--signal-live); }
+.cameraSection[data-audio-state="connected"] .statusItem--audio .statusItem__dot {
+  background: var(--signal-live);
+  animation: liveDotPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  50%      { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+
+/* ---- Video stage ---- */
 .cameraStage {
   position: relative;
   width: 100%;
@@ -169,83 +229,171 @@ audio {
   display: block;
 }
 
+.cameraSection:has(#video[src]) .cameraStage::before { display: none; }
+.cameraSection:not(:has(#video[src])) #video { visibility: hidden; }
+
+/* ---- Control row: 2 text toggles + 2 icon toggles ---- */
 .cameraControls {
   display: flex;
   gap: 8px;
-  padding: 12px 16px 14px;
+  padding: 12px 14px;
   background: var(--bg-1);
 }
 
-.camToggleBtn {
+/* Shared rectangular toggle (camera + audio) */
+.toggleBtn {
   flex: 1;
   margin: 0;
-  padding: 14px 16px;
+  padding: 14px 10px;
   min-height: 48px;
   background: transparent;
   border: 1px solid var(--border-2);
   border-radius: var(--radius-sm);
   color: var(--text-0);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Default (offline) — green-tinted START affordance */
-.camToggleBtn:hover {
+.toggleBtn:hover {
   border-color: var(--signal-live);
   color: var(--signal-live);
 }
-.camToggleBtn:active {
+.toggleBtn:active {
   background: rgba(16, 185, 129, 0.12);
   border-color: var(--signal-live);
   color: var(--signal-live);
 }
 
-/* Live — red-tinted STOP affordance (state-driven by #video[src]) */
-.cameraSection:has(#video[src]) .camToggleBtn {
+/* Camera toggle "active" treatment (red — pressing stops the stream) */
+.cameraSection:has(#video[src]) .toggleBtn--cam {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
 }
-.cameraSection:has(#video[src]) .camToggleBtn:hover {
-  background: rgba(239, 68, 68, 0.08);
+.cameraSection:has(#video[src]) .toggleBtn--cam:hover,
+.cameraSection:has(#video[src]) .toggleBtn--cam:active {
+  background: rgba(239, 68, 68, 0.10);
   border-color: var(--signal-stop);
   color: var(--signal-stop);
 }
-.cameraSection:has(#video[src]) .camToggleBtn:active {
-  background: rgba(239, 68, 68, 0.16);
+
+/* Audio toggle "active" treatment */
+.cameraSection[data-audio-state="connecting"] .toggleBtn--audio,
+.cameraSection[data-audio-state="connected"] .toggleBtn--audio {
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+}
+.cameraSection[data-audio-state="connecting"] .toggleBtn--audio:hover,
+.cameraSection[data-audio-state="connected"] .toggleBtn--audio:hover,
+.cameraSection[data-audio-state="connecting"] .toggleBtn--audio:active,
+.cameraSection[data-audio-state="connected"] .toggleBtn--audio:active {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
 }
 
-/* ---------- State-driven label swap ---------- */
-.camToggleBtn__label--stop { display: none; }
-.cameraSection:has(#video[src]) .camToggleBtn__label--start { display: none; }
-.cameraSection:has(#video[src]) .camToggleBtn__label--stop { display: inline; }
+/* Label swap (camera) */
+.toggleBtn__label--camOn { display: none; }
+.cameraSection:has(#video[src]) .toggleBtn__label--camOff { display: none; }
+.cameraSection:has(#video[src]) .toggleBtn__label--camOn { display: inline; }
 
-/* Hide the NO SIGNAL overlay + show img only when live */
-.cameraSection:has(#video[src]) .cameraStage::before { display: none; }
-.cameraSection:not(:has(#video[src])) #video { visibility: hidden; }
+/* Label swap (audio): "Link Audio" until connected/connecting */
+.toggleBtn__label--audioOn { display: none; }
+.cameraSection[data-audio-state="connecting"] .toggleBtn__label--audioOff,
+.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOff { display: none; }
+.cameraSection[data-audio-state="connecting"] .toggleBtn__label--audioOn,
+.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOn { display: inline; }
 
-/* Live badge swap */
-.cameraSection:has(#video[src]) .liveLabel--off { display: none; }
-.cameraSection:has(#video[src]) .liveLabel--on { display: inline; }
-.cameraSection:has(#video[src]) .liveLabel--on { color: var(--signal-live); }
-.cameraSection:has(#video[src]) .liveDot {
-  background: var(--signal-live);
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
-  animation: liveDotPulse 1.8s ease-in-out infinite;
+/* ---- Icon buttons (listen / talk) ---- */
+.iconBtn {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-@keyframes liveDotPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
-  }
+.iconBtn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+  background: var(--bg-2);
+}
+
+.iconBtn:not(:disabled):hover {
+  border-color: var(--border-3);
+  color: var(--text-0);
+}
+
+.iconBtn__svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Icon swap (default to OFF variant; ON variant shown when state is on) */
+.iconBtn__svg--on { display: none; }
+.iconBtn__svg--off { display: inline-block; }
+
+.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--off { display: none; }
+.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--on { display: inline-block; }
+.cameraSection[data-audio-listen="on"] .iconBtn--listen {
+  border-color: var(--signal-info);
+  color: var(--signal-info);
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--off { display: none; }
+.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--on { display: inline-block; }
+.cameraSection[data-audio-talk="on"] .iconBtn--talk {
+  border-color: var(--signal-live);
+  color: var(--signal-live);
+  background: rgba(16, 185, 129, 0.10);
+  animation: talkActivePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes talkActivePulse {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0); }
+  50%      { box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.22); }
+}
+
+/* ---- Audio sink (hidden — element kept in DOM for WebRTC playback) ---- */
+.audioPlayerSink {
+  display: none;
+}
+
+/* ---- Audio status line (errors only — hidden in happy path) ---- */
+.audioStatusLine {
+  margin: 0;
+  padding: 0 14px 12px;
+  background: var(--bg-1);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  min-height: 0;
+  display: none;
+}
+
+.audioStatusLine.error {
+  display: block;
+  color: var(--signal-stop);
+  padding-top: 4px;
 }
 
 /* ---------- Desktop layout ---------- */
@@ -269,9 +417,12 @@ audio {
     justify-content: flex-start;
   }
 
-  .camToggleBtn {
+  .toggleBtn {
     flex: 0 0 auto;
-    min-width: 200px;
+    min-width: 180px;
+    padding: 14px 18px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
   }
 }
 
@@ -361,8 +512,4 @@ audio {
 .systemPanel button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
-}
-
-.realtimeAudioPanel audio {
-  max-width: 360px;
 }

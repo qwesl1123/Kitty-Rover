@@ -14,12 +14,28 @@
 <body>
     <section class="cameraSection">
         <header class="cameraHeader">
-            <h2 class="sectionLabel">Camera</h2>
-            <span class="liveBadge" aria-live="polite">
-                <span class="liveDot" aria-hidden="true"></span>
-                <span class="liveLabel liveLabel--off">Offline</span>
-                <span class="liveLabel liveLabel--on">Live</span>
-            </span>
+            <h2 class="srOnly">Camera and Realtime Audio</h2>
+            <div class="statusBar" aria-live="polite">
+                <span class="statusItem statusItem--camera">
+                    <svg class="statusItem__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m22 8-6 4 6 4V8Z"/>
+                        <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+                    </svg>
+                    <span class="statusItem__dot"></span>
+                    <span class="statusItem__label statusItem__label--camOff">Offline</span>
+                    <span class="statusItem__label statusItem__label--camOn">Live</span>
+                </span>
+                <span class="statusBar__divider" aria-hidden="true"></span>
+                <span class="statusItem statusItem--audio">
+                    <svg class="statusItem__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1v-6a9 9 0 0 1 18 0v6a1 1 0 0 1-1 1h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>
+                    </svg>
+                    <span class="statusItem__dot"></span>
+                    <span class="statusItem__label statusItem__label--audioOff">Off</span>
+                    <span class="statusItem__label statusItem__label--audioConnecting">Linking</span>
+                    <span class="statusItem__label statusItem__label--audioOn">Linked</span>
+                </span>
+            </div>
         </header>
 
         <div class="cameraStage">
@@ -27,11 +43,48 @@
         </div>
 
         <div class="cameraControls">
-            <button id="camToggle" class="camToggleBtn">
-                <span class="camToggleBtn__label camToggleBtn__label--start">Start Camera</span>
-                <span class="camToggleBtn__label camToggleBtn__label--stop">Stop Camera</span>
+            <button id="camToggle" class="toggleBtn toggleBtn--cam">
+                <span class="toggleBtn__label toggleBtn__label--camOff">Start Camera</span>
+                <span class="toggleBtn__label toggleBtn__label--camOn">Stop Camera</span>
+            </button>
+            <button id="webrtcToggle" class="toggleBtn toggleBtn--audio">
+                <span class="toggleBtn__label toggleBtn__label--audioOff">Link Audio</span>
+                <span class="toggleBtn__label toggleBtn__label--audioOn">Unlink Audio</span>
+            </button>
+            <button id="webrtcListenToggle" class="iconBtn iconBtn--listen" disabled aria-label="Toggle listen">
+                <svg class="iconBtn__svg iconBtn__svg--off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="2" y1="2" x2="22" y2="22"/>
+                    <path d="M3 14h3a2 2 0 0 1 2 2v3"/>
+                    <path d="M21 14v-2a9 9 0 0 0-14.7-7"/>
+                    <path d="M3 13.9a9 9 0 0 0 .27 2.07"/>
+                    <path d="M16 16v3a2 2 0 0 0 2 2h2a1 1 0 0 0 1-1v-3"/>
+                </svg>
+                <svg class="iconBtn__svg iconBtn__svg--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1v-6a9 9 0 0 1 18 0v6a1 1 0 0 1-1 1h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>
+                </svg>
+            </button>
+            <button id="webrtcTalkToggle" class="iconBtn iconBtn--talk" disabled aria-label="Toggle talk">
+                <svg class="iconBtn__svg iconBtn__svg--off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="2" y1="2" x2="22" y2="22"/>
+                    <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/>
+                    <path d="M5 10v2a7 7 0 0 0 12 5"/>
+                    <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/>
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+                <svg class="iconBtn__svg iconBtn__svg--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="2" width="6" height="12" rx="3"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
             </button>
         </div>
+
+        <div class="audioPlayerSink">
+            <audio id="webrtcRemoteAudio" autoplay playsinline></audio>
+        </div>
+
+        <p id="webrtcStatus" class="audioStatusLine statusMessage">Disconnected</p>
     </section>
 
     <section class="panel">
@@ -48,19 +101,6 @@
         <button id="talkBtn">Record 3s Voice Clip</button>
         <p id="talkStatus">Idle</p>
     </section>
-
-    <section class="panel realtimeAudioPanel">
-        <h2>Realtime Audio</h2>
-
-        <button id="webrtcConnect">Connect Realtime Audio</button>
-        <button id="webrtcDisconnect" disabled>Disconnect Realtime Audio</button>
-        <button id="webrtcListenToggle" disabled>Listen ON</button>
-        <button id="webrtcTalkToggle" disabled>Talk ON</button>
-
-        <p id="webrtcStatus" class="statusMessage">Disconnected</p>
-        <audio id="webrtcRemoteAudio" autoplay playsinline controls></audio>
-    </section>
-
 
     <section class="panel systemPanel">
         <h2>System</h2>

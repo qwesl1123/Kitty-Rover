@@ -7,6 +7,7 @@ if (!socket) {
 // Camera
 const video = document.getElementById("video");
 const camToggle = document.getElementById("camToggle");
+const cameraSection = document.querySelector(".cameraSection");
 
 camToggle.addEventListener("click", () => {
   if (video.hasAttribute("src")) {
@@ -304,8 +305,7 @@ window.addEventListener("beforeunload", () => cancelVoiceClip("beforeunload"));
 
 
 // Realtime WebRTC audio
-const webrtcConnect = document.getElementById("webrtcConnect");
-const webrtcDisconnect = document.getElementById("webrtcDisconnect");
+const webrtcToggle = document.getElementById("webrtcToggle");
 const webrtcListenToggle = document.getElementById("webrtcListenToggle");
 const webrtcTalkToggle = document.getElementById("webrtcTalkToggle");
 const webrtcStatus = document.getElementById("webrtcStatus");
@@ -329,12 +329,20 @@ function setWebrtcStatus(message, isError = false) {
 function updateWebrtcButtons() {
   const connected = Boolean(webrtcPc) && !webrtcConnecting;
   const hasLocalAudioTrack = Boolean(webrtcLocalStream?.getAudioTracks()?.length);
-  webrtcConnect.disabled = webrtcConnecting || connected;
-  webrtcDisconnect.disabled = !webrtcConnecting && !connected;
   webrtcListenToggle.disabled = !connected;
   webrtcTalkToggle.disabled = !connected || (!hasLocalAudioTrack && !isIOS);
-  webrtcListenToggle.textContent = webrtcListenEnabled ? "Listen ON" : "Listen OFF";
-  webrtcTalkToggle.textContent = webrtcTalkEnabled ? "Talk ON" : "Talk OFF";
+
+  if (cameraSection) {
+    let audioState = "disconnected";
+    if (webrtcConnecting) {
+      audioState = "connecting";
+    } else if (connected) {
+      audioState = "connected";
+    }
+    cameraSection.dataset.audioState = audioState;
+    cameraSection.dataset.audioListen = webrtcListenEnabled ? "on" : "off";
+    cameraSection.dataset.audioTalk = webrtcTalkEnabled ? "on" : "off";
+  }
 }
 
 function stopWebrtcLocalTracks() {
@@ -616,8 +624,13 @@ async function connectWebrtcAudio() {
   }
 }
 
-webrtcConnect.addEventListener("click", connectWebrtcAudio);
-webrtcDisconnect.addEventListener("click", () => closeWebrtcAudio({ statusMessage: "Disconnected" }));
+webrtcToggle.addEventListener("click", () => {
+  if (webrtcPc || webrtcConnecting) {
+    closeWebrtcAudio({ statusMessage: "Disconnected" });
+  } else {
+    connectWebrtcAudio();
+  }
+});
 webrtcTalkToggle.addEventListener("click", async () => setWebrtcTalk(!webrtcTalkEnabled));
 webrtcListenToggle.addEventListener("click", () => setWebrtcListen(!webrtcListenEnabled));
 
