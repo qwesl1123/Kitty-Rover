@@ -17,6 +17,7 @@ Flask-SocketIO==5.6.1
 frozenlist==1.8.0
 google-crc32c==1.8.0
 greenlet==3.5.0
+gunicorn==26.0.0
 h11==0.16.0
 idna==3.15
 ifaddr==0.2.0
@@ -26,7 +27,9 @@ MarkupSafe==3.0.3
 multidict==6.7.1
 numpy==2.4.5
 opencv-python==4.13.0.92
+packaging==26.2
 propcache==0.5.2
+psutil==7.2.2
 pycparser==3.0
 pyee==13.0.1
 pylibsrtp==1.0.0
