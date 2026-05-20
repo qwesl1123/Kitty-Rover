@@ -87,19 +87,26 @@
         <p id="webrtcStatus" class="audioStatusLine statusMessage">Disconnected</p>
     </section>
 
-    <section class="panel">
-        <h2>Fallback Audio</h2>
+    <section class="fallbackAudioSection">
+        <header class="fallbackAudioHeader">
+            <h2 class="srOnly">Fallback Audio</h2>
+            <span class="sectionLabel">Fallback Audio</span>
+        </header>
 
-        <button id="startMic">Listen to Rover Mic</button>
-        <button id="stopMic">Stop Listening</button>
+        <div class="fallbackAudioBody">
+            <div class="fallbackBtnRow">
+                <button id="startMic" class="toggleBtn">Listen to Rover Mic</button>
+                <button id="stopMic" class="toggleBtn">Stop Listening</button>
+            </div>
 
-        <audio id="micAudio" controls></audio>
-        <p id="micStatus">Idle</p>
+            <audio id="micAudio" controls></audio>
+            <p id="micStatus" class="fallbackStatus">Idle</p>
 
-        <hr>
+            <hr class="fallbackDivider">
 
-        <button id="talkBtn">Record 3s Voice Clip</button>
-        <p id="talkStatus">Idle</p>
+            <button id="talkBtn" class="toggleBtn toggleBtn--wide">Record 3s Voice Clip</button>
+            <p id="talkStatus" class="fallbackStatus">Idle</p>
+        </div>
     </section>
 
     <section class="panel systemPanel">
