@@ -824,6 +824,58 @@ function formatNetwork(network) {
   interfacesValue.textContent = compactInterfaces.length > 0 ? compactInterfaces.join("; ") : "Unknown";
 }
 
+// Phase 4: derive warning flags + battery pill state from raw status data.
+// Sets data attributes on <body> and individual stat rows so CSS can react;
+// also updates the battery icon fill width and the pill percent readout.
+function applySystemWarnings(data) {
+  const battery = data && data.battery;
+  const cpuTempData = data && data.cpu_temp;
+  const resources = data && data.resources;
+
+  // --- Battery: level bucket + pill text + fill width ---
+  let batteryLevel = "unknown";
+  let batteryPct = null;
+  if (battery && typeof battery.capacity_percent === "number") {
+    batteryPct = battery.capacity_percent;
+    if (batteryPct < 20) batteryLevel = "low";
+    else if (batteryPct < 50) batteryLevel = "med";
+    else batteryLevel = "ok";
+  }
+  document.body.dataset.batteryLevel = batteryLevel;
+
+  const pillPercent = document.getElementById("batteryPercentPill");
+  if (pillPercent) {
+    pillPercent.textContent = batteryPct !== null ? batteryPct + "%" : "--";
+  }
+  const pillFill = document.querySelector(".batteryIcon__fill");
+  if (pillFill) {
+    const clamped = batteryPct !== null ? Math.max(0, Math.min(100, batteryPct)) : 0;
+    pillFill.style.width = clamped + "%";
+  }
+
+  // --- Per-row warnings ---
+  const rowWarnings = {
+    cpuTemp: cpuTempData && typeof cpuTempData.celsius === "number" && cpuTempData.celsius > 80,
+    ramUsage: resources && typeof resources.ram_percent === "number" && resources.ram_percent > 90,
+    diskUsage: resources && typeof resources.disk_percent === "number" && resources.disk_percent > 90,
+  };
+
+  let anyWarning = batteryLevel === "low";
+  for (const [stat, warn] of Object.entries(rowWarnings)) {
+    const row = document.querySelector(`[data-stat="${stat}"]`);
+    if (row) {
+      if (warn) {
+        row.setAttribute("data-warn", "");
+      } else {
+        row.removeAttribute("data-warn");
+      }
+    }
+    if (warn) anyWarning = true;
+  }
+
+  document.body.dataset.systemWarnings = anyWarning ? "1" : "0";
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
@@ -849,6 +901,7 @@ async function refreshSystemStatusNow() {
     formatCpuTemp(data.cpu_temp);
     formatResources(data.resources);
     formatNetwork(data.network);
+    applySystemWarnings(data);
     setSystemMessage("System status updated " + new Date().toLocaleTimeString());
   } catch (err) {
     setSystemMessage("System status error: " + err.message, true);

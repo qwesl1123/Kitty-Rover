@@ -12,6 +12,8 @@
 </head>
 
 <body>
+    <input type="checkbox" id="systemSheetToggle" class="systemSheetToggle" hidden>
+
     <section class="cameraSection">
         <header class="cameraHeader">
             <h2 class="srOnly">Camera and Realtime Audio</h2>
@@ -36,6 +38,19 @@
                     <span class="statusItem__label statusItem__label--audioOn">Linked</span>
                 </span>
             </div>
+            <label for="systemSheetToggle" class="systemBar" aria-label="Open system panel">
+                <span class="systemBar__segment systemBar__segment--battery">
+                    <span class="batteryIcon" aria-hidden="true">
+                        <span class="batteryIcon__fill"></span>
+                    </span>
+                    <span class="systemBar__percent" id="batteryPercentPill">--</span>
+                </span>
+                <span class="systemBar__divider" aria-hidden="true"></span>
+                <span class="systemBar__segment systemBar__segment--system">
+                    <span>System</span>
+                    <span class="systemBar__warn" aria-hidden="true">!</span>
+                </span>
+            </label>
         </header>
 
         <div class="cameraStage">
@@ -109,61 +124,6 @@
         </div>
     </section>
 
-    <section class="panel systemPanel">
-        <h2>System</h2>
-
-        <p>
-            Battery:
-            <strong id="batteryPercent">
-                {{ system_status.battery.capacity_percent if system_status.battery.capacity_percent is not none else "Unknown" }}{% if system_status.battery.capacity_percent is not none %}%{% endif %}
-            </strong>
-            <span id="batteryStatus">({{ system_status.battery.status or "unknown" }})</span>
-        </p>
-        <p>
-            CPU Temp:
-            <strong id="cpuTemp">
-                {{ "%.1f"|format(system_status.cpu_temp.celsius) if system_status.cpu_temp.celsius is not none else "Unknown" }}{% if system_status.cpu_temp.celsius is not none %} °C{% endif %}
-            </strong>
-        </p>
-        <p>
-            CPU Usage:
-            <strong id="cpuUsage">Unknown</strong>
-        </p>
-        <p>
-            RAM Usage:
-            <strong id="ramUsage">Unknown</strong>
-        </p>
-        <p>
-            Disk Usage:
-            <strong id="diskUsage">Unknown</strong>
-        </p>
-        <p>
-            Uptime:
-            <strong id="uptime">Unknown</strong>
-        </p>
-        <p>
-            Hostname:
-            <strong id="hostnameValue">Unknown</strong>
-        </p>
-        <p>
-            LAN IP:
-            <strong id="lanIpValue">Unknown</strong>
-        </p>
-        <p>
-            Tailscale IP:
-            <strong id="tailscaleIpValue">Unknown</strong>
-        </p>
-        <p>
-            Active Interfaces:
-            <strong id="interfacesValue">Unknown</strong>
-        </p>
-        <p id="systemStatusMessage" class="statusMessage">Initial status loaded from server; live refresh starting...</p>
-
-        <button id="refreshSystemStatus">Refresh Status</button>
-        <button id="screenOff">Screen Off</button>
-        <button id="screenOn">Screen On</button>
-    </section>
-
     <section class="panel driveStatusPanel">
         <h2>Drive</h2>
         <p>Left: <strong id="driveLeft">0</strong> | Right: <strong id="driveRight">0</strong></p>
@@ -176,6 +136,83 @@
         <button class="driveBtn back" data-left="-160" data-right="-160">▼</button>
         <button class="driveBtn right" data-left="120" data-right="-120">▶</button>
     </div>
+
+    <label for="systemSheetToggle" class="systemSheet__backdrop" aria-hidden="true"></label>
+
+    <aside class="systemSheet" role="dialog" aria-modal="true" aria-label="System status">
+        <header class="systemSheet__header">
+            <h2 class="systemSheet__title">System</h2>
+            <label for="systemSheetToggle" class="systemSheet__close" aria-label="Close system panel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                </svg>
+            </label>
+        </header>
+
+        <div class="systemSheet__scroll">
+            <p class="systemGroupLabel">Health</p>
+
+            <p class="statRow" data-stat="battery">
+                <span class="statRow__key">Battery:</span>
+                <strong id="batteryPercent">{{ system_status.battery.capacity_percent if system_status.battery.capacity_percent is not none else "Unknown" }}{% if system_status.battery.capacity_percent is not none %}%{% endif %}</strong>
+                <span id="batteryStatus">({{ system_status.battery.status or "unknown" }})</span>
+                <span class="statRow__warn" aria-hidden="true">!</span>
+            </p>
+            <p class="statRow" data-stat="cpuTemp">
+                <span class="statRow__key">CPU Temp:</span>
+                <strong id="cpuTemp">{{ "%.1f"|format(system_status.cpu_temp.celsius) if system_status.cpu_temp.celsius is not none else "Unknown" }}{% if system_status.cpu_temp.celsius is not none %} °C{% endif %}</strong>
+                <span class="statRow__warn" aria-hidden="true">!</span>
+            </p>
+            <p class="statRow" data-stat="cpuUsage">
+                <span class="statRow__key">CPU Usage:</span>
+                <strong id="cpuUsage">Unknown</strong>
+            </p>
+            <p class="statRow" data-stat="ramUsage">
+                <span class="statRow__key">RAM Usage:</span>
+                <strong id="ramUsage">Unknown</strong>
+                <span class="statRow__warn" aria-hidden="true">!</span>
+            </p>
+            <p class="statRow" data-stat="diskUsage">
+                <span class="statRow__key">Disk Usage:</span>
+                <strong id="diskUsage">Unknown</strong>
+                <span class="statRow__warn" aria-hidden="true">!</span>
+            </p>
+            <p class="statRow" data-stat="uptime">
+                <span class="statRow__key">Uptime:</span>
+                <strong id="uptime">Unknown</strong>
+            </p>
+
+            <p class="systemGroupLabel">Network</p>
+
+            <p class="statRow">
+                <span class="statRow__key">Hostname:</span>
+                <strong id="hostnameValue">Unknown</strong>
+            </p>
+            <p class="statRow">
+                <span class="statRow__key">LAN IP:</span>
+                <strong id="lanIpValue">Unknown</strong>
+            </p>
+            <p class="statRow">
+                <span class="statRow__key">Tailscale IP:</span>
+                <strong id="tailscaleIpValue">Unknown</strong>
+            </p>
+            <p class="statRow statRow--wrap">
+                <span class="statRow__key">Active Interfaces:</span>
+                <strong id="interfacesValue">Unknown</strong>
+            </p>
+
+            <p id="systemStatusMessage" class="statusMessage systemStatusLine">Initial status loaded from server; live refresh starting...</p>
+
+            <p class="systemGroupLabel">Actions</p>
+
+            <div class="systemActions">
+                <button id="refreshSystemStatus" class="toggleBtn">Refresh Status</button>
+                <button id="screenOff" class="toggleBtn">Screen Off</button>
+                <button id="screenOn" class="toggleBtn">Screen On</button>
+            </div>
+        </div>
+    </aside>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/control.js') }}?v=p5-webrtc-audio-20260518"></script>

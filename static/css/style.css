@@ -98,6 +98,11 @@ audio {
 }
 
 .cameraHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 10px 14px 8px;
   background: var(--bg-1);
 }
@@ -452,11 +457,11 @@ audio {
 /* Section label — small mono caps, matches Frigate tooling aesthetic */
 .sectionLabel {
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.20em;
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--text-0);
   display: inline-block;
   line-height: 1;
 }
@@ -527,8 +532,335 @@ audio {
 }
 
 /* =========================================================
-   Untouched legacy styles below — Phase 2+ will refactor.
+   SYSTEM BAR + BOTTOM SHEET  (Phase 4)
    ========================================================= */
+
+/* ---- System bar in cameraHeader (battery pill + system pill) ---- */
+.systemBar {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 24px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease;
+  font-family: var(--mono);
+}
+
+.systemBar:hover {
+  border-color: var(--border-3);
+}
+
+.systemBar__divider {
+  width: 1px;
+  background: var(--border-1);
+  align-self: stretch;
+}
+
+.systemBar__segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-1);
+  line-height: 1;
+}
+
+.systemBar__percent {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-0);
+  min-width: 26px;
+  text-align: right;
+  line-height: 1;
+}
+
+.systemBar__warn {
+  display: none;
+  color: var(--signal-warn);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+body[data-system-warnings="1"] .systemBar__warn {
+  display: inline;
+}
+
+/* ---- iPhone-style battery icon ---- */
+.batteryIcon {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 11px;
+  border: 1px solid var(--text-1);
+  border-radius: 2px;
+  padding: 1px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.batteryIcon::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 2px;
+  height: 5px;
+  background: var(--text-1);
+  border-radius: 0 1px 1px 0;
+  transform: translateY(-50%);
+}
+
+.batteryIcon__fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--signal-live);
+  border-radius: 1px;
+  transition: width 0.3s ease, background 0.2s ease;
+}
+
+body[data-battery-level="low"] .batteryIcon__fill { background: var(--signal-stop); }
+body[data-battery-level="med"] .batteryIcon__fill { background: var(--signal-warn); }
+body[data-battery-level="ok"] .batteryIcon__fill  { background: var(--signal-live); }
+
+body[data-battery-level="low"] .systemBar__percent { color: var(--signal-stop); }
+body[data-battery-level="med"] .systemBar__percent { color: var(--signal-warn); }
+
+/* ---- Backdrop ---- */
+.systemSheet__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 99;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  cursor: pointer;
+}
+
+.systemSheetToggle:checked ~ .systemSheet__backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---- Bottom sheet ---- */
+.systemSheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70vh;
+  max-height: 70vh;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border-1);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--sans);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.systemSheetToggle:checked ~ .systemSheet {
+  transform: translateY(0);
+}
+
+/* Lock body scroll when sheet open */
+html:has(.systemSheetToggle:checked) body {
+  overflow: hidden;
+}
+
+.systemSheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-1);
+  flex-shrink: 0;
+}
+
+.systemSheet__title {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-0);
+  line-height: 1;
+}
+
+.systemSheet__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -8px -8px -8px 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.systemSheet__close:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+
+.systemSheet__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.systemSheet__scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Group labels (HEALTH / NETWORK / ACTIONS) ---- */
+.systemGroupLabel {
+  margin: 16px 0 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  line-height: 1;
+}
+
+.systemGroupLabel:first-child {
+  margin-top: 0;
+}
+
+/* ---- Stat rows ---- */
+.statRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-1);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-0);
+  line-height: 1.4;
+}
+
+.statRow:last-of-type {
+  border-bottom: none;
+}
+
+.statRow__key {
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.statRow strong {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--text-0);
+  word-break: break-all;
+}
+
+.statRow #batteryStatus {
+  color: var(--text-2);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+/* Wrapping variant for very long values (Active Interfaces) */
+.statRow--wrap {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.statRow--wrap strong {
+  font-size: 11px;
+}
+
+/* Row warning indicator — bold amber "!" */
+.statRow__warn {
+  display: none;
+  margin-left: auto;
+  color: var(--signal-warn);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.statRow[data-warn] .statRow__warn {
+  display: inline;
+}
+
+.statRow[data-warn] strong {
+  color: var(--signal-warn);
+}
+
+/* ---- System status line inside sheet ---- */
+.systemStatusLine {
+  margin: 16px 0 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  color: var(--text-2);
+  text-transform: none;
+}
+
+.systemStatusLine.error {
+  color: var(--signal-stop);
+}
+
+/* ---- Actions row ---- */
+.systemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.systemActions .toggleBtn {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+/* ---- Desktop refinements ---- */
+@media (min-width: 760px) {
+  .systemSheet {
+    left: auto;
+    right: 16px;
+    bottom: 16px;
+    width: 480px;
+    max-width: calc(100vw - 32px);
+    height: auto;
+    max-height: 80vh;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+  }
+}
 
 .drivePad {
   position: fixed;
@@ -609,7 +941,8 @@ audio {
   color: #ff9a9a;
 }
 
-.systemPanel button:disabled {
+.systemActions button:disabled,
+.systemSheet button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
