@@ -27,6 +27,11 @@ def home():
     return render_template("index.html", system_status=get_system_status())
 
 
+@app.route("/face-screen")
+def face_screen():
+    return render_template("face_screen.html")
+
+
 @app.route("/video_feed")
 def video_feed():
     return Response(

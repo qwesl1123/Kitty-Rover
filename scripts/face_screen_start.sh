@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-URL="${1:-http://127.0.0.1:5000/}"
+URL="${1:-http://127.0.0.1:5000/face-screen}"
 
 if [ "$(id -u)" = "0" ]; then
     echo "Do not run this as root. Run as franklin/local user."
