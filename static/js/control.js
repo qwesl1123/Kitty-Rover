@@ -8,6 +8,9 @@ if (!socket) {
 const video = document.getElementById("video");
 const camToggle = document.getElementById("camToggle");
 const cameraSection = document.querySelector(".cameraSection");
+const startBackCam = document.getElementById("startBackCam");
+const stopBackCam = document.getElementById("stopBackCam");
+const backVideo = document.getElementById("backVideo");
 
 camToggle.addEventListener("click", () => {
   if (video.hasAttribute("src")) {
@@ -16,6 +19,16 @@ camToggle.addEventListener("click", () => {
     video.src = "/video_feed?t=" + Date.now();
   }
 });
+
+if (startBackCam && stopBackCam && backVideo) {
+  startBackCam.addEventListener("click", () => {
+    backVideo.src = "/back_video_feed?t=" + Date.now();
+  });
+
+  stopBackCam.addEventListener("click", () => {
+    backVideo.removeAttribute("src");
+  });
+}
 
 // Audio
 const startMic = document.getElementById("startMic");

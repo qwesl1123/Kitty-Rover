@@ -1,22 +1,39 @@
 import time
 import threading
 import cv2
-from config import CAMERA_DEVICE, CAMERA_WIDTH, CAMERA_HEIGHT, CAMERA_FPS, JPEG_QUALITY
+from config import (
+    CAMERA_DEVICE,
+    CAMERA_WIDTH,
+    CAMERA_HEIGHT,
+    CAMERA_FPS,
+    JPEG_QUALITY,
+    BACK_CAMERA_DEVICE,
+    BACK_CAMERA_WIDTH,
+    BACK_CAMERA_HEIGHT,
+    BACK_CAMERA_FPS,
+    BACK_JPEG_QUALITY,
+)
 
 
 class LazyCamera:
-    def __init__(self):
+    def __init__(self, device, width, height, fps, jpeg_quality, label="camera"):
         self.cap = None
         self.lock = threading.Lock()
         self.active_clients = 0
+        self.device = device
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self.jpeg_quality = jpeg_quality
+        self.label = label
 
     def open(self):
         if self.cap is None:
-            print("[camera] opening camera")
-            self.cap = cv2.VideoCapture(CAMERA_DEVICE)
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-            self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+            print(f"[{self.label}] opening camera on {self.device}")
+            self.cap = cv2.VideoCapture(self.device)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
 
             if not self.cap.isOpened():
                 self.cap.release()
@@ -25,7 +42,7 @@ class LazyCamera:
 
     def close(self):
         if self.cap is not None:
-            print("[camera] releasing camera")
+            print(f"[{self.label}] releasing camera")
             self.cap.release()
             self.cap = None
 
@@ -35,7 +52,7 @@ class LazyCamera:
             self.open()
 
         try:
-            delay = 1.0 / CAMERA_FPS
+            delay = 1.0 / self.fps if self.fps > 0 else 0
 
             while True:
                 with self.lock:
@@ -51,7 +68,7 @@ class LazyCamera:
                 ok, jpeg = cv2.imencode(
                     ".jpg",
                     frame,
-                    [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
+                    [int(cv2.IMWRITE_JPEG_QUALITY), self.jpeg_quality],
                 )
 
                 if not ok:
@@ -74,4 +91,20 @@ class LazyCamera:
                     self.close()
 
 
-camera = LazyCamera()
+camera = LazyCamera(
+    CAMERA_DEVICE,
+    CAMERA_WIDTH,
+    CAMERA_HEIGHT,
+    CAMERA_FPS,
+    JPEG_QUALITY,
+    label="front-camera",
+)
+
+back_camera = LazyCamera(
+    BACK_CAMERA_DEVICE,
+    BACK_CAMERA_WIDTH,
+    BACK_CAMERA_HEIGHT,
+    BACK_CAMERA_FPS,
+    BACK_JPEG_QUALITY,
+    label="back-camera",
+)

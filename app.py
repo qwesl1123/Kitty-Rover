@@ -1,7 +1,7 @@
 from flask import Flask, Response, render_template, request, jsonify
 from flask_socketio import SocketIO
 
-from rover.camera import camera
+from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
 from rover.webrtc_audio import close_audio_peer_sync, get_audio_status, handle_audio_offer_sync
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
@@ -31,6 +31,14 @@ def home():
 def video_feed():
     return Response(
         camera.stream(),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.route("/back_video_feed")
+def back_video_feed():
+    return Response(
+        back_camera.stream(),
         mimetype="multipart/x-mixed-replace; boundary=frame",
     )
 

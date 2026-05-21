@@ -237,6 +237,33 @@ audio {
 .cameraSection:has(#video[src]) .cameraStage::before { display: none; }
 .cameraSection:not(:has(#video[src])) #video { visibility: hidden; }
 
+.backCameraPanel .backCameraStage {
+  width: 100%;
+  max-width: 640px;
+  margin-bottom: 10px;
+}
+
+.backCameraPanel .backCameraStage #backVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.backCameraPanel .backCameraControls {
+  display: flex;
+  gap: 8px;
+  max-width: 640px;
+}
+
+.backCameraPanel .backCameraControls .toggleBtn {
+  flex: 1;
+}
+
+.backCameraPanel .backCameraStage:not(:has(#backVideo[src])) #backVideo {
+  visibility: hidden;
+}
+
 /* ---- Control row: 2 text toggles + 2 icon toggles ---- */
 .cameraControls {
   display: flex;
