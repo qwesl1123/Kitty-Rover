@@ -760,6 +760,8 @@ const screenOff = document.getElementById("screenOff");
 const screenOn = document.getElementById("screenOn");
 const faceScreenToggle = document.getElementById("faceScreenToggle");
 const faceScreenStatus = document.getElementById("faceScreenStatus");
+const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
+const faceScreenTest = document.getElementById("faceScreenTest");
 const SYSTEM_REFRESH_MS = 10000;
 
 let faceScreenRunning = false;
@@ -923,6 +925,46 @@ function applySystemWarnings(data) {
   document.body.dataset.systemWarnings = anyWarning ? "1" : "0";
 }
 
+
+function updateFaceScreenClientStatus(connected, message = "") {
+  if (!faceScreenClientStatus) {
+    return;
+  }
+
+  faceScreenClientStatus.textContent = `Face Screen Client: ${connected ? "Connected" : "Not Connected"}`;
+
+  if (message && faceScreenStatus) {
+    faceScreenStatus.textContent = `Face Screen: ${message}`;
+  }
+}
+
+if (socket) {
+  socket.on("face_screen_status", (payload) => {
+    const connected = Boolean(payload && payload.connected);
+    const message = payload && payload.message ? String(payload.message) : "";
+    updateFaceScreenClientStatus(connected, message);
+  });
+}
+
+async function refreshFaceScreenClientStatus() {
+  try {
+    const data = await fetchJsonOrThrow("/face_screen/status");
+    updateFaceScreenClientStatus(Boolean(data.connected));
+  } catch (err) {
+    updateFaceScreenClientStatus(false);
+  }
+}
+
+function sendFaceScreenTestMessage() {
+  if (!socket) {
+    setSystemMessage("Send Test Message failed: Socket unavailable", true);
+    return;
+  }
+
+  socket.emit("face_screen_test_message", { message: "Hello from controller" });
+  setSystemMessage("Send Test Message sent");
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
@@ -950,6 +992,7 @@ async function refreshSystemStatusNow() {
     formatNetwork(data.network);
     formatFaceScreen(data.face_screen);
     applySystemWarnings(data);
+    await refreshFaceScreenClientStatus();
     setSystemMessage("System status updated " + new Date().toLocaleTimeString());
   } catch (err) {
     setSystemMessage("System status error: " + err.message, true);
@@ -987,6 +1030,9 @@ screenOff.addEventListener("click", () => postScreenControl("/system/screen_off"
 screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", "Screen on"));
 if (faceScreenToggle) {
   faceScreenToggle.addEventListener("click", postFaceScreenToggle);
+}
+if (faceScreenTest) {
+  faceScreenTest.addEventListener("click", sendFaceScreenTestMessage);
 }
 
 refreshSystemStatusNow();

@@ -39,13 +39,63 @@
       font-size: clamp(0.9rem, 1.6vw, 1.1rem);
       color: #9c9c9c;
     }
+    .message {
+      margin-top: 2rem;
+      min-height: 3.5rem;
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #7dd3fc;
+    }
   </style>
 </head>
 <body>
   <main class="wrap" role="main" aria-live="polite">
     <h1>Waiting for face video...</h1>
     <p class="sub">Rover Face Screen Ready</p>
-    <p class="status">Keep this screen open. Start face video from controller.</p>
+    <p id="faceScreenConnectionStatus" class="status">Connecting to rover server...</p>
+    <p id="faceScreenMessage" class="message"></p>
   </main>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const statusEl = document.getElementById("faceScreenConnectionStatus");
+    const messageEl = document.getElementById("faceScreenMessage");
+    const socket = typeof io === "function" ? io() : null;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    if (!socket) {
+      setStatus("Disconnected");
+    } else {
+      socket.on("connect", () => {
+        setStatus("Connected to rover server · Waiting for controller...");
+        socket.emit("face_screen_join");
+      });
+
+      socket.on("disconnect", () => {
+        setStatus("Disconnected");
+      });
+
+      socket.on("face_screen_display_message", (payload) => {
+        const message = payload && payload.message ? String(payload.message) : "";
+        if (message) {
+          messageEl.textContent = message;
+          setStatus("Controller message received");
+        }
+      });
+
+      const leaveFaceScreen = () => {
+        if (socket.connected) {
+          socket.emit("face_screen_leave");
+        }
+      };
+
+      window.addEventListener("pagehide", leaveFaceScreen);
+      window.addEventListener("beforeunload", leaveFaceScreen);
+    }
+  </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 from flask import Flask, Response, render_template, request, jsonify
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
@@ -18,6 +18,20 @@ app.config["SECRET_KEY"] = "rover-dev-secret"
 MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+FACE_SCREEN_ROOM = "face_screen"
+face_screen_connected = False
+face_screen_sid = None
+last_face_screen_message = None
+
+
+def emit_face_screen_status(message=None):
+    payload = {"connected": face_screen_connected}
+    if message:
+        payload["message"] = message
+    if last_face_screen_message is not None:
+        payload["last_message"] = last_face_screen_message
+    socketio.emit("face_screen_status", payload)
 
 
 def emit_drive_status(status=None):
@@ -108,6 +122,17 @@ def system_status():
     return jsonify(get_system_status())
 
 
+@app.route("/face_screen/status")
+def face_screen_status():
+    return jsonify(
+        {
+            "ok": True,
+            "connected": face_screen_connected,
+            "last_message": last_face_screen_message,
+        }
+    )
+
+
 
 @app.route("/system/face_screen_start", methods=["POST"])
 def system_face_screen_start():
@@ -176,8 +201,53 @@ def handle_connect():
     emit_drive_status()
 
 
+@socketio.on("face_screen_join")
+def handle_face_screen_join():
+    global face_screen_connected, face_screen_sid
+
+    join_room(FACE_SCREEN_ROOM)
+    face_screen_connected = True
+    face_screen_sid = request.sid
+    emit_face_screen_status("Face screen connected")
+
+
+@socketio.on("face_screen_leave")
+def handle_face_screen_leave():
+    global face_screen_connected, face_screen_sid
+
+    leave_room(FACE_SCREEN_ROOM)
+
+    if request.sid == face_screen_sid:
+        face_screen_connected = False
+        face_screen_sid = None
+        emit_face_screen_status("Face screen disconnected")
+
+
+@socketio.on("face_screen_test_message")
+def handle_face_screen_test_message(data):
+    global last_face_screen_message
+
+    message = ""
+    if isinstance(data, dict):
+        message = str(data.get("message") or "")
+
+    if not message:
+        message = "Hello from controller"
+
+    last_face_screen_message = message
+    emit("face_screen_display_message", {"message": message}, room=FACE_SCREEN_ROOM)
+    emit_face_screen_status("Controller message received")
+
+
 @socketio.on("disconnect")
 def handle_disconnect():
+    global face_screen_connected, face_screen_sid
+
+    if request.sid == face_screen_sid:
+        face_screen_connected = False
+        face_screen_sid = None
+        emit_face_screen_status("Face screen disconnected")
+
     stop()
 
 
