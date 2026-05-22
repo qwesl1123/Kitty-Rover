@@ -773,6 +773,7 @@ let faceScreenClientConnected = false;
 let faceVideoPc = null;
 let faceVideoLocalStream = null;
 let faceVideoActive = false;
+let faceVideoPendingRemoteIce = [];
 const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function setSystemMessage(message, isError = false) {
@@ -973,9 +974,11 @@ function closeFaceVideoPeer() {
   if (faceVideoPc) {
     faceVideoPc.onicecandidate = null;
     faceVideoPc.onconnectionstatechange = null;
+    faceVideoPc.oniceconnectionstatechange = null;
     faceVideoPc.close();
   }
   faceVideoPc = null;
+  faceVideoPendingRemoteIce = [];
 }
 
 function stopFaceVideoLocally(statusMessage = "Face Video stopped") {
@@ -1020,6 +1023,8 @@ async function startFaceVideo() {
     });
 
     faceVideoLocalStream = stream;
+    console.log("Face Video: camera acquired");
+    setFaceVideoStatus("Face Video camera acquired");
     if (faceVideoPreview) {
       faceVideoPreview.srcObject = stream;
       faceVideoPreview.style.display = "block";
@@ -1038,6 +1043,8 @@ async function startFaceVideo() {
     faceVideoPc.onconnectionstatechange = () => {
       if (!faceVideoPc) return;
       const state = faceVideoPc.connectionState;
+      console.log("Face Video connectionState:", state);
+      setFaceVideoStatus("Face Video connectionState: " + state, ["failed", "disconnected", "closed"].includes(state));
       if (state === "connected") {
         faceVideoActive = true;
         setFaceVideoStatus("Face Video active");
@@ -1046,9 +1053,21 @@ async function startFaceVideo() {
       }
     };
 
+    faceVideoPc.oniceconnectionstatechange = () => {
+      if (!faceVideoPc) return;
+      const state = faceVideoPc.iceConnectionState;
+      console.log("Face Video iceConnectionState:", state);
+      setFaceVideoStatus("Face Video iceConnectionState: " + state, state === "failed");
+    };
+
     const offer = await faceVideoPc.createOffer();
+    console.log("Face Video: offer created");
+    setFaceVideoStatus("Face Video offer created");
     await faceVideoPc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(faceVideoPc);
     socket.emit("face_video_offer", faceVideoPc.localDescription);
+    console.log("Face Video: offer sent");
+    setFaceVideoStatus("Face Video offer sent");
   } catch (err) {
     await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
     if (faceVideoStatus) {
@@ -1073,7 +1092,11 @@ if (socket) {
     }
     try {
       await faceVideoPc.setRemoteDescription(new RTCSessionDescription(answer));
-      setFaceVideoStatus("Face Video connecting...");
+      while (faceVideoPendingRemoteIce.length > 0) {
+        await faceVideoPc.addIceCandidate(faceVideoPendingRemoteIce.shift());
+      }
+      console.log("Face Video: answer received");
+      setFaceVideoStatus("Face Video answer received");
     } catch (err) {
       await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
     }
@@ -1084,6 +1107,11 @@ if (socket) {
       return;
     }
     try {
+      if (!faceVideoPc.remoteDescription) {
+        faceVideoPendingRemoteIce.push(payload.candidate);
+        setFaceVideoStatus("Face Video ICE queued");
+        return;
+      }
       await faceVideoPc.addIceCandidate(payload.candidate);
     } catch (err) {
       setFaceVideoStatus("Face Video ICE error: " + err.message, true);
