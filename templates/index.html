@@ -124,8 +124,12 @@
         <div class="faceScreenBody">
             <button id="faceScreenToggle" class="toggleBtn toggleBtn--face">Show Face</button>
             <button id="faceScreenTest" class="toggleBtn">Send Test Message</button>
+            <button id="faceVideoStart" class="toggleBtn">Start Face Video</button>
+            <button id="faceVideoStop" class="toggleBtn">Stop Face Video</button>
+            <video id="faceVideoPreview" muted playsinline style="display:none;max-width:180px;border-radius:10px;margin-top:0.75rem;"></video>
             <p id="faceScreenStatus" class="fallbackStatus">Face Screen: Unknown</p>
             <p id="faceScreenClientStatus" class="fallbackStatus">Face Screen Client: Not Connected</p>
+            <p id="faceVideoStatus" class="fallbackStatus">Face Video stopped</p>
         </div>
     </section>
 

@@ -23,6 +23,8 @@ FACE_SCREEN_ROOM = "face_screen"
 face_screen_connected = False
 face_screen_sid = None
 last_face_screen_message = None
+face_video_sender_sid = None
+face_video_active = False
 
 
 def emit_face_screen_status(message=None):
@@ -239,14 +241,96 @@ def handle_face_screen_test_message(data):
     emit_face_screen_status("Controller message received")
 
 
+@socketio.on("face_video_offer")
+def handle_face_video_offer(data):
+    global face_video_sender_sid, face_video_active
+
+    if not face_screen_connected or not face_screen_sid:
+        emit("face_video_status", {"ok": False, "error": "Face Screen not connected"})
+        return
+
+    if not isinstance(data, dict) or data.get("type") != "offer" or not data.get("sdp"):
+        emit("face_video_status", {"ok": False, "error": "Invalid face video offer payload"})
+        return
+
+    face_video_sender_sid = request.sid
+    face_video_active = True
+    emit("face_video_offer", data, to=face_screen_sid)
+    emit("face_video_status", {"ok": True, "status": "offer_relayed"}, to=face_video_sender_sid)
+
+
+@socketio.on("face_video_answer")
+def handle_face_video_answer(data):
+    if not isinstance(data, dict) or data.get("type") != "answer" or not data.get("sdp"):
+        return
+
+    if face_video_sender_sid:
+        emit("face_video_answer", data, to=face_video_sender_sid)
+    else:
+        emit("face_video_answer", data, broadcast=True, include_self=False)
+
+
+@socketio.on("face_video_ice")
+def handle_face_video_ice(data):
+    if not isinstance(data, dict):
+        return
+
+    candidate = data.get("candidate")
+    if not candidate:
+        return
+
+    target = data.get("target")
+    payload = {"candidate": candidate}
+
+    if target == "face_screen":
+        if face_screen_connected and face_screen_sid:
+            emit("face_video_ice", payload, to=face_screen_sid)
+        return
+
+    if target == "controller":
+        if face_video_sender_sid:
+            emit("face_video_ice", payload, to=face_video_sender_sid)
+        return
+
+    if request.sid == face_screen_sid:
+        if face_video_sender_sid:
+            emit("face_video_ice", payload, to=face_video_sender_sid)
+    elif face_screen_connected and face_screen_sid:
+        emit("face_video_ice", payload, to=face_screen_sid)
+
+
+@socketio.on("face_video_stop")
+def handle_face_video_stop():
+    global face_video_sender_sid, face_video_active
+
+    if face_screen_connected and face_screen_sid:
+        emit("face_video_stop", {}, to=face_screen_sid)
+
+    if face_video_sender_sid:
+        emit("face_video_stop", {}, to=face_video_sender_sid)
+
+    face_video_active = False
+    face_video_sender_sid = None
+
+
 @socketio.on("disconnect")
 def handle_disconnect():
-    global face_screen_connected, face_screen_sid
+    global face_screen_connected, face_screen_sid, face_video_sender_sid, face_video_active
 
     if request.sid == face_screen_sid:
         face_screen_connected = False
         face_screen_sid = None
+        face_video_active = False
+        if face_video_sender_sid:
+            emit("face_video_stop", {}, to=face_video_sender_sid)
+        face_video_sender_sid = None
         emit_face_screen_status("Face screen disconnected")
+
+    if request.sid == face_video_sender_sid:
+        if face_screen_connected and face_screen_sid:
+            emit("face_video_stop", {}, to=face_screen_sid)
+        face_video_sender_sid = None
+        face_video_active = False
 
     stop()
 

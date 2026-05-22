@@ -762,9 +762,18 @@ const faceScreenToggle = document.getElementById("faceScreenToggle");
 const faceScreenStatus = document.getElementById("faceScreenStatus");
 const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
 const faceScreenTest = document.getElementById("faceScreenTest");
+const faceVideoStart = document.getElementById("faceVideoStart");
+const faceVideoStop = document.getElementById("faceVideoStop");
+const faceVideoStatus = document.getElementById("faceVideoStatus");
+const faceVideoPreview = document.getElementById("faceVideoPreview");
 const SYSTEM_REFRESH_MS = 10000;
 
 let faceScreenRunning = false;
+let faceScreenClientConnected = false;
+let faceVideoPc = null;
+let faceVideoLocalStream = null;
+let faceVideoActive = false;
+const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function setSystemMessage(message, isError = false) {
   systemStatusMessage.textContent = message;
@@ -927,6 +936,7 @@ function applySystemWarnings(data) {
 
 
 function updateFaceScreenClientStatus(connected, message = "") {
+  faceScreenClientConnected = connected;
   if (!faceScreenClientStatus) {
     return;
   }
@@ -938,11 +948,158 @@ function updateFaceScreenClientStatus(connected, message = "") {
   }
 }
 
+function setFaceVideoStatus(message, isError = false) {
+  if (!faceVideoStatus) return;
+  faceVideoStatus.textContent = message;
+  faceVideoStatus.classList.toggle("error", isError);
+}
+
+function clearFaceVideoPreview() {
+  if (!faceVideoPreview) return;
+  faceVideoPreview.pause();
+  faceVideoPreview.srcObject = null;
+  faceVideoPreview.style.display = "none";
+}
+
+function stopFaceVideoLocalTracks() {
+  if (faceVideoLocalStream) {
+    faceVideoLocalStream.getTracks().forEach((track) => track.stop());
+  }
+  faceVideoLocalStream = null;
+  clearFaceVideoPreview();
+}
+
+function closeFaceVideoPeer() {
+  if (faceVideoPc) {
+    faceVideoPc.onicecandidate = null;
+    faceVideoPc.onconnectionstatechange = null;
+    faceVideoPc.close();
+  }
+  faceVideoPc = null;
+}
+
+function stopFaceVideoLocally(statusMessage = "Face Video stopped") {
+  closeFaceVideoPeer();
+  stopFaceVideoLocalTracks();
+  faceVideoActive = false;
+  setFaceVideoStatus(statusMessage);
+}
+
+async function stopFaceVideo({ notify = true, statusMessage = "Face Video stopped" } = {}) {
+  stopFaceVideoLocally(statusMessage);
+  if (notify && socket) {
+    socket.emit("face_video_stop");
+  }
+}
+
+async function startFaceVideo() {
+  if (!socket) {
+    setFaceVideoStatus("Face Video error: Socket unavailable", true);
+    return;
+  }
+  if (!faceScreenClientConnected) {
+    setFaceVideoStatus("Face Screen not connected. Click Show Face first.", true);
+    return;
+  }
+
+  if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
+    setFaceVideoStatus("Face Video error: browser video WebRTC is not supported", true);
+    return;
+  }
+
+  await stopFaceVideo({ notify: false, statusMessage: "Face Video connecting..." });
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 15, max: 30 },
+      },
+      audio: false,
+    });
+
+    faceVideoLocalStream = stream;
+    if (faceVideoPreview) {
+      faceVideoPreview.srcObject = stream;
+      faceVideoPreview.style.display = "block";
+      faceVideoPreview.play().catch(() => {});
+    }
+
+    faceVideoPc = new RTCPeerConnection(faceVideoRtcConfig);
+    stream.getVideoTracks().forEach((track) => faceVideoPc.addTrack(track, stream));
+
+    faceVideoPc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("face_video_ice", { candidate: event.candidate, target: "face_screen" });
+      }
+    };
+
+    faceVideoPc.onconnectionstatechange = () => {
+      if (!faceVideoPc) return;
+      const state = faceVideoPc.connectionState;
+      if (state === "connected") {
+        faceVideoActive = true;
+        setFaceVideoStatus("Face Video active");
+      } else if (["failed", "disconnected", "closed"].includes(state)) {
+        stopFaceVideoLocally("Face Video stopped");
+      }
+    };
+
+    const offer = await faceVideoPc.createOffer();
+    await faceVideoPc.setLocalDescription(offer);
+    socket.emit("face_video_offer", faceVideoPc.localDescription);
+  } catch (err) {
+    await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
+    if (faceVideoStatus) {
+      faceVideoStatus.classList.add("error");
+    }
+  }
+}
+
 if (socket) {
   socket.on("face_screen_status", (payload) => {
     const connected = Boolean(payload && payload.connected);
     const message = payload && payload.message ? String(payload.message) : "";
     updateFaceScreenClientStatus(connected, message);
+    if (!connected && faceVideoActive) {
+      stopFaceVideoLocally("Face screen disconnected");
+    }
+  });
+
+  socket.on("face_video_answer", async (answer) => {
+    if (!faceVideoPc || !answer || answer.type !== "answer" || !answer.sdp) {
+      return;
+    }
+    try {
+      await faceVideoPc.setRemoteDescription(new RTCSessionDescription(answer));
+      setFaceVideoStatus("Face Video connecting...");
+    } catch (err) {
+      await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
+    }
+  });
+
+  socket.on("face_video_ice", async (payload) => {
+    if (!faceVideoPc || !payload || !payload.candidate) {
+      return;
+    }
+    try {
+      await faceVideoPc.addIceCandidate(payload.candidate);
+    } catch (err) {
+      setFaceVideoStatus("Face Video ICE error: " + err.message, true);
+    }
+  });
+
+  socket.on("face_video_status", (payload) => {
+    if (!payload) return;
+    if (payload.ok === false && payload.error) {
+      stopFaceVideoLocally("Face Video stopped");
+      setFaceVideoStatus(String(payload.error), true);
+    }
+  });
+
+  socket.on("face_video_stop", () => {
+    stopFaceVideoLocally("Face Video stopped");
   });
 }
 
@@ -1034,6 +1191,19 @@ if (faceScreenToggle) {
 if (faceScreenTest) {
   faceScreenTest.addEventListener("click", sendFaceScreenTestMessage);
 }
+if (faceVideoStart) {
+  faceVideoStart.addEventListener("click", startFaceVideo);
+}
+if (faceVideoStop) {
+  faceVideoStop.addEventListener("click", () => stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" }));
+}
+
+window.addEventListener("pagehide", () => {
+  stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+});
+window.addEventListener("beforeunload", () => {
+  stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+});
 
 refreshSystemStatusNow();
 setInterval(refreshSystemStatusNow, SYSTEM_REFRESH_MS);

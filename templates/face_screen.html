@@ -16,12 +16,26 @@
       font-family: Arial, Helvetica, sans-serif;
     }
     body {
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
       padding: 2rem;
+      overflow: hidden;
     }
+    #faceVideo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      opacity: 0;
+      transition: opacity 120ms ease-in-out;
+    }
+    body.video-active #faceVideo { opacity: 1; }
+    body.video-active .wrap { opacity: 0; pointer-events: none; }
     .wrap { max-width: 900px; }
     h1 {
       margin: 0 0 1rem;
@@ -50,6 +64,7 @@
   </style>
 </head>
 <body>
+  <video id="faceVideo" autoplay playsinline></video>
   <main class="wrap" role="main" aria-live="polite">
     <h1>Waiting for face video...</h1>
     <p class="sub">Rover Face Screen Ready</p>
@@ -61,7 +76,11 @@
   <script>
     const statusEl = document.getElementById("faceScreenConnectionStatus");
     const messageEl = document.getElementById("faceScreenMessage");
+    const faceVideo = document.getElementById("faceVideo");
     const socket = typeof io === "function" ? io() : null;
+    const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+    let faceVideoPc = null;
+    let remoteStream = null;
 
     function setStatus(text) {
       statusEl.textContent = text;
@@ -70,13 +89,61 @@
     if (!socket) {
       setStatus("Disconnected");
     } else {
+      function showWaiting(statusText = "Waiting for controller...") {
+        document.body.classList.remove("video-active");
+        setStatus(statusText);
+      }
+
+      function showVideo() {
+        document.body.classList.add("video-active");
+        setStatus("Face video active");
+      }
+
+      function cleanupFaceVideo(statusText = "Waiting for controller...") {
+        if (faceVideoPc) {
+          faceVideoPc.ontrack = null;
+          faceVideoPc.onicecandidate = null;
+          faceVideoPc.close();
+        }
+        faceVideoPc = null;
+        remoteStream = null;
+        faceVideo.pause();
+        faceVideo.srcObject = null;
+        showWaiting(statusText);
+      }
+
+      async function prepareFaceVideoPeer() {
+        if (faceVideoPc) {
+          cleanupFaceVideo("Restarting face video...");
+        }
+
+        faceVideoPc = new RTCPeerConnection(rtcConfig);
+        remoteStream = new MediaStream();
+        faceVideo.srcObject = remoteStream;
+
+        faceVideoPc.ontrack = (event) => {
+          event.streams[0]?.getTracks().forEach((track) => remoteStream.addTrack(track));
+          if (!event.streams[0]) {
+            remoteStream.addTrack(event.track);
+          }
+          faceVideo.play().catch(() => {});
+          showVideo();
+        };
+
+        faceVideoPc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("face_video_ice", { candidate: event.candidate, target: "controller" });
+          }
+        };
+      }
+
       socket.on("connect", () => {
         setStatus("Connected to rover server · Waiting for controller...");
         socket.emit("face_screen_join");
       });
 
       socket.on("disconnect", () => {
-        setStatus("Disconnected");
+        cleanupFaceVideo("Disconnected");
       });
 
       socket.on("face_screen_display_message", (payload) => {
@@ -87,7 +154,40 @@
         }
       });
 
+      socket.on("face_video_offer", async (offer) => {
+        if (!offer || offer.type !== "offer" || !offer.sdp) {
+          return;
+        }
+
+        try {
+          await prepareFaceVideoPeer();
+          await faceVideoPc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await faceVideoPc.createAnswer();
+          await faceVideoPc.setLocalDescription(answer);
+          socket.emit("face_video_answer", faceVideoPc.localDescription);
+          setStatus("Face video connecting...");
+        } catch (err) {
+          cleanupFaceVideo("Face video error: " + err.message);
+        }
+      });
+
+      socket.on("face_video_ice", async (payload) => {
+        if (!faceVideoPc || !payload || !payload.candidate) {
+          return;
+        }
+        try {
+          await faceVideoPc.addIceCandidate(payload.candidate);
+        } catch (err) {
+          setStatus("ICE error: " + err.message);
+        }
+      });
+
+      socket.on("face_video_stop", () => {
+        cleanupFaceVideo("Waiting for controller...");
+      });
+
       const leaveFaceScreen = () => {
+        cleanupFaceVideo("Leaving page...");
         if (socket.connected) {
           socket.emit("face_screen_leave");
         }
