@@ -458,6 +458,52 @@ audio {
   }
 }
 
+
+.faceScreenSection {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  margin-bottom: 24px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border-1);
+  border-bottom: 1px solid var(--border-1);
+  font-family: var(--sans);
+}
+
+.faceScreenHeader {
+  padding: 9px 14px 7px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-1);
+}
+
+.faceScreenBody {
+  padding: 10px 14px 12px;
+}
+
+.toggleBtn--face {
+  min-width: 180px;
+  border-color: var(--signal-info);
+  color: var(--signal-info);
+}
+
+.toggleBtn--face.toggleBtn--danger {
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+}
+
+@media (min-width: 760px) {
+  .faceScreenSection {
+    width: auto;
+    position: static;
+    left: auto;
+    margin: 0 0 24px;
+    max-width: 960px;
+    border: 1px solid var(--border-1);
+  }
+}
+
 /* =========================================================
    FALLBACK AUDIO SECTION  (Phase 3 — Frigate-styled, compact)
    ========================================================= */

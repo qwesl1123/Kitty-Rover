@@ -5,7 +5,13 @@ from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
 from rover.webrtc_audio import close_audio_peer_sync, get_audio_status, handle_audio_offer_sync
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
-from rover.system_control import get_system_status, screen_off, screen_on
+from rover.system_control import (
+    face_screen_start,
+    face_screen_stop,
+    get_system_status,
+    screen_off,
+    screen_on,
+)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
@@ -101,6 +107,18 @@ def status():
 def system_status():
     return jsonify(get_system_status())
 
+
+
+@app.route("/system/face_screen_start", methods=["POST"])
+def system_face_screen_start():
+    result = face_screen_start()
+    return jsonify(result), 200 if result.get("ok") else 500
+
+
+@app.route("/system/face_screen_stop", methods=["POST"])
+def system_face_screen_stop():
+    result = face_screen_stop()
+    return jsonify(result), 200 if result.get("ok") else 500
 
 @app.route("/system/screen_off", methods=["POST"])
 def system_screen_off():

@@ -758,7 +758,11 @@ const systemStatusMessage = document.getElementById("systemStatusMessage");
 const refreshSystemStatus = document.getElementById("refreshSystemStatus");
 const screenOff = document.getElementById("screenOff");
 const screenOn = document.getElementById("screenOn");
+const faceScreenToggle = document.getElementById("faceScreenToggle");
+const faceScreenStatus = document.getElementById("faceScreenStatus");
 const SYSTEM_REFRESH_MS = 10000;
+
+let faceScreenRunning = false;
 
 function setSystemMessage(message, isError = false) {
   systemStatusMessage.textContent = message;
@@ -835,6 +839,31 @@ function formatNetwork(network) {
     : [];
 
   interfacesValue.textContent = compactInterfaces.length > 0 ? compactInterfaces.join("; ") : "Unknown";
+}
+
+function formatFaceScreen(faceScreen) {
+  if (!faceScreenStatus || !faceScreenToggle) {
+    return;
+  }
+
+  const isRunning = Boolean(faceScreen && faceScreen.running);
+  const state = faceScreen && typeof faceScreen.state === "string" ? faceScreen.state : "unknown";
+
+  if (isRunning) {
+    faceScreenStatus.textContent = "Face Screen: Running";
+    faceScreenToggle.textContent = "Hide Face";
+    faceScreenToggle.classList.add("toggleBtn--danger");
+  } else if (state === "inactive") {
+    faceScreenStatus.textContent = "Face Screen: Stopped";
+    faceScreenToggle.textContent = "Show Face";
+    faceScreenToggle.classList.remove("toggleBtn--danger");
+  } else {
+    faceScreenStatus.textContent = "Face Screen: Unknown";
+    faceScreenToggle.textContent = "Show Face";
+    faceScreenToggle.classList.remove("toggleBtn--danger");
+  }
+
+  faceScreenRunning = isRunning;
 }
 
 // Phase 4: derive warning flags + battery pill state from raw status data.
@@ -919,6 +948,7 @@ async function refreshSystemStatusNow() {
     formatCpuTemp(data.cpu_temp);
     formatResources(data.resources);
     formatNetwork(data.network);
+    formatFaceScreen(data.face_screen);
     applySystemWarnings(data);
     setSystemMessage("System status updated " + new Date().toLocaleTimeString());
   } catch (err) {
@@ -937,9 +967,27 @@ async function postScreenControl(url, actionName) {
   }
 }
 
+
+async function postFaceScreenToggle() {
+  const endpoint = faceScreenRunning ? "/system/face_screen_stop" : "/system/face_screen_start";
+  const actionName = faceScreenRunning ? "Hide Face" : "Show Face";
+
+  try {
+    setSystemMessage(actionName + "...");
+    await fetchJsonOrThrow(endpoint, { method: "POST" });
+    setSystemMessage(actionName + " succeeded");
+    await refreshSystemStatusNow();
+  } catch (err) {
+    setSystemMessage(actionName + " failed: " + err.message, true);
+  }
+}
+
 refreshSystemStatus.addEventListener("click", refreshSystemStatusNow);
 screenOff.addEventListener("click", () => postScreenControl("/system/screen_off", "Screen off"));
 screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", "Screen on"));
+if (faceScreenToggle) {
+  faceScreenToggle.addEventListener("click", postFaceScreenToggle);
+}
 
 refreshSystemStatusNow();
 setInterval(refreshSystemStatusNow, SYSTEM_REFRESH_MS);

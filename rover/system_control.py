@@ -277,6 +277,68 @@ def screen_on() -> dict[str, Any]:
     return _run_screen_script(SCREEN_ON_SCRIPT)
 
 
+
+
+def get_face_screen_status() -> dict[str, Any]:
+    """Return rover-face-screen.service activity state in a JSON-safe shape."""
+    try:
+        completed = subprocess.run(
+            ["systemctl", "is-active", "rover-face-screen.service"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return {"running": False, "state": "unknown", "error": "systemctl is-active timed out"}
+    except OSError as err:
+        return {"running": False, "state": "unknown", "error": str(err)}
+
+    state = (completed.stdout or completed.stderr or "unknown").strip().lower() or "unknown"
+    running = state == "active"
+    if state not in {"active", "inactive", "failed"}:
+        state = "unknown"
+
+    return {"running": running, "state": state}
+
+
+def _run_face_screen_action(action: str) -> dict[str, Any]:
+    """Start or stop rover-face-screen.service and return a JSON-safe result."""
+    try:
+        completed = subprocess.run(
+            ["sudo", "-n", "/usr/bin/systemctl", action, "rover-face-screen.service"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"face screen {action} timed out after 10s"}
+    except OSError as err:
+        return {"ok": False, "error": str(err)}
+
+    if completed.returncode != 0:
+        return {
+            "ok": False,
+            "error": completed.stderr.strip() or completed.stdout.strip() or f"face screen {action} failed",
+            "returncode": completed.returncode,
+        }
+
+    return {
+        "ok": True,
+        "returncode": completed.returncode,
+        "face_screen": get_face_screen_status(),
+    }
+
+
+def face_screen_start() -> dict[str, Any]:
+    """Start rover-face-screen.service."""
+    return _run_face_screen_action("start")
+
+
+def face_screen_stop() -> dict[str, Any]:
+    """Stop rover-face-screen.service."""
+    return _run_face_screen_action("stop")
 def get_system_status() -> dict[str, Any]:
     """Return the appliance status shown in the web UI."""
     return {
@@ -285,4 +347,5 @@ def get_system_status() -> dict[str, Any]:
         "cpu_temp": get_cpu_temp(),
         "resources": get_resource_status(),
         "network": get_network_status(),
+        "face_screen": get_face_screen_status(),
     }
