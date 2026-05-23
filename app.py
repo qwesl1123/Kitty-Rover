@@ -22,7 +22,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 FACE_SCREEN_ROOM = "face_screen"
 face_screen_connected = False
 face_screen_sid = None
-last_face_screen_message = None
 face_video_sender_sid = None
 face_video_active = False
 
@@ -31,8 +30,6 @@ def emit_face_screen_status(message=None):
     payload = {"connected": face_screen_connected}
     if message:
         payload["message"] = message
-    if last_face_screen_message is not None:
-        payload["last_message"] = last_face_screen_message
     socketio.emit("face_screen_status", payload)
 
 
@@ -130,7 +127,6 @@ def face_screen_status():
         {
             "ok": True,
             "connected": face_screen_connected,
-            "last_message": last_face_screen_message,
         }
     )
 
@@ -223,22 +219,6 @@ def handle_face_screen_leave():
         face_screen_connected = False
         face_screen_sid = None
         emit_face_screen_status("Face screen disconnected")
-
-
-@socketio.on("face_screen_test_message")
-def handle_face_screen_test_message(data):
-    global last_face_screen_message
-
-    message = ""
-    if isinstance(data, dict):
-        message = str(data.get("message") or "")
-
-    if not message:
-        message = "Hello from controller"
-
-    last_face_screen_message = message
-    emit("face_screen_display_message", {"message": message}, room=FACE_SCREEN_ROOM)
-    emit_face_screen_status("Controller message received")
 
 
 @socketio.on("face_video_offer")

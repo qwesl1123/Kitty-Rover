@@ -761,7 +761,6 @@ const screenOn = document.getElementById("screenOn");
 const faceScreenToggle = document.getElementById("faceScreenToggle");
 const faceScreenStatus = document.getElementById("faceScreenStatus");
 const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
-const faceScreenTest = document.getElementById("faceScreenTest");
 const faceVideoStart = document.getElementById("faceVideoStart");
 const faceVideoStop = document.getElementById("faceVideoStop");
 const faceVideoStatus = document.getElementById("faceVideoStatus");
@@ -1140,15 +1139,6 @@ async function refreshFaceScreenClientStatus() {
   }
 }
 
-function sendFaceScreenTestMessage() {
-  if (!socket) {
-    setSystemMessage("Send Test Message failed: Socket unavailable", true);
-    return;
-  }
-
-  socket.emit("face_screen_test_message", { message: "Hello from controller" });
-  setSystemMessage("Send Test Message sent");
-}
 
 async function fetchJsonOrThrow(url, options = {}) {
   const response = await fetch(url, options);
@@ -1215,9 +1205,6 @@ screenOff.addEventListener("click", () => postScreenControl("/system/screen_off"
 screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", "Screen on"));
 if (faceScreenToggle) {
   faceScreenToggle.addEventListener("click", postFaceScreenToggle);
-}
-if (faceScreenTest) {
-  faceScreenTest.addEventListener("click", sendFaceScreenTestMessage);
 }
 if (faceVideoStart) {
   faceVideoStart.addEventListener("click", startFaceVideo);

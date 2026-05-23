@@ -69,13 +69,11 @@
     <h1>Waiting for face video...</h1>
     <p class="sub">Rover Face Screen Ready</p>
     <p id="faceScreenConnectionStatus" class="status">Connecting to rover server...</p>
-    <p id="faceScreenMessage" class="message"></p>
   </main>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
     const statusEl = document.getElementById("faceScreenConnectionStatus");
-    const messageEl = document.getElementById("faceScreenMessage");
     const faceVideo = document.getElementById("faceVideo");
     const socket = typeof io === "function" ? io() : null;
     const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -190,14 +188,6 @@
 
       socket.on("disconnect", () => {
         cleanupFaceVideo("Disconnected");
-      });
-
-      socket.on("face_screen_display_message", (payload) => {
-        const message = payload && payload.message ? String(payload.message) : "";
-        if (message) {
-          messageEl.textContent = message;
-          setStatus("Controller message received");
-        }
       });
 
       socket.on("face_video_offer", async (offer) => {
