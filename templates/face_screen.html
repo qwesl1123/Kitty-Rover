@@ -80,6 +80,10 @@
     let faceVideoPc = null;
     let remoteStream = null;
     let remoteIceQueue = [];
+    let relayViewerPc = null;
+    let relayViewerId = null;
+    let relayViewerRetryTimer = null;
+    let relayViewerConnecting = false;
 
     function setStatus(text) {
       statusEl.textContent = text;
@@ -95,7 +99,7 @@
 
       function showVideo() {
         document.body.classList.add("video-active");
-        setStatus("Face video active");
+        setStatus("Video playing");
       }
 
       function waitForIceGatheringComplete(pc) {
@@ -131,6 +135,154 @@
         faceVideo.pause();
         faceVideo.srcObject = null;
         showWaiting(statusText);
+      }
+
+      function clearRelayRetryTimer() {
+        if (relayViewerRetryTimer) {
+          clearTimeout(relayViewerRetryTimer);
+          relayViewerRetryTimer = null;
+        }
+      }
+
+      function scheduleRelayViewerRetry(statusText = "Waiting for phone camera...") {
+        clearRelayRetryTimer();
+        showWaiting(statusText);
+        relayViewerRetryTimer = setTimeout(() => {
+          startRelayViewer();
+        }, 2000);
+      }
+
+      async function stopRelayViewer(statusText = "Waiting for phone camera...") {
+        clearRelayRetryTimer();
+        relayViewerConnecting = false;
+
+        if (relayViewerPc) {
+          relayViewerPc.ontrack = null;
+          relayViewerPc.oniceconnectionstatechange = null;
+          relayViewerPc.onconnectionstatechange = null;
+          relayViewerPc.close();
+          relayViewerPc = null;
+        }
+
+        const closingViewerId = relayViewerId;
+        relayViewerId = null;
+
+        faceVideo.pause();
+        faceVideo.srcObject = null;
+        document.body.classList.remove("video-active");
+        showWaiting(statusText);
+
+        if (closingViewerId) {
+          try {
+            await fetch("/webrtc/face_video/view_close", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ viewer_id: closingViewerId })
+            });
+          } catch (err) {
+            setStatus("Relay viewer close warning: " + err.message);
+          }
+        }
+      }
+
+      async function startRelayViewer() {
+        if (!socket.connected || relayViewerConnecting || relayViewerPc) {
+          return;
+        }
+
+        clearRelayRetryTimer();
+        relayViewerConnecting = true;
+        showWaiting("Relay viewer connecting...");
+
+        try {
+          const pc = new RTCPeerConnection(rtcConfig);
+          relayViewerPc = pc;
+          let trackReceived = false;
+
+          pc.addTransceiver("video", { direction: "recvonly" });
+
+          pc.ontrack = (event) => {
+            trackReceived = true;
+            setStatus("Remote track received");
+            const stream = event.streams && event.streams[0]
+              ? event.streams[0]
+              : new MediaStream([event.track]);
+            faceVideo.srcObject = stream;
+            faceVideo.play().catch((err) => {
+              setStatus("Relay viewer failed: " + err.message);
+            });
+          };
+
+          pc.oniceconnectionstatechange = () => {
+            if (!relayViewerPc || relayViewerPc !== pc) return;
+            const state = pc.iceConnectionState;
+            setStatus("Relay viewer ICE: " + state);
+            if (["failed", "disconnected", "closed"].includes(state)) {
+              stopRelayViewer("Relay viewer failed: " + state).finally(() => {
+                scheduleRelayViewerRetry("Waiting for phone camera...");
+              });
+            }
+          };
+
+          pc.onconnectionstatechange = () => {
+            if (!relayViewerPc || relayViewerPc !== pc) return;
+            const state = pc.connectionState;
+            if (state === "connected") {
+              setStatus(trackReceived ? "Remote track received" : "Relay viewer connected");
+            } else if (["failed", "disconnected", "closed"].includes(state)) {
+              stopRelayViewer("Relay viewer failed: " + state).finally(() => {
+                scheduleRelayViewerRetry("Waiting for phone camera...");
+              });
+            } else {
+              setStatus("Relay viewer state: " + state);
+            }
+          };
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await waitForIceGatheringComplete(pc);
+
+          const response = await fetch("/webrtc/face_video/view_offer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pc.localDescription)
+          });
+
+          let payload = {};
+          try {
+            payload = await response.json();
+          } catch (err) {
+            payload = {};
+          }
+
+          if (!response.ok) {
+            relayViewerPc = null;
+            pc.close();
+            if (response.status === 409 && payload.code === "no_publisher") {
+              showWaiting("No phone camera publisher yet");
+              scheduleRelayViewerRetry("Waiting for phone camera...");
+              return;
+            }
+            throw new Error(payload.error || ("HTTP " + response.status));
+          }
+
+          if (!payload.sdp || !payload.type || !payload.viewer_id) {
+            throw new Error("Invalid relay answer payload");
+          }
+
+          relayViewerId = payload.viewer_id;
+          await pc.setRemoteDescription(new RTCSessionDescription({
+            sdp: payload.sdp,
+            type: payload.type
+          }));
+          showWaiting("Connected to face video relay; waiting for frames...");
+          setStatus("Relay viewer connected");
+        } catch (err) {
+          await stopRelayViewer("Relay viewer failed: " + err.message);
+          scheduleRelayViewerRetry("Waiting for phone camera...");
+        } finally {
+          relayViewerConnecting = false;
+        }
       }
 
       async function prepareFaceVideoPeer() {
@@ -184,10 +336,12 @@
       socket.on("connect", () => {
         setStatus("Connected to rover server · Waiting for controller...");
         socket.emit("face_screen_join");
+        startRelayViewer();
       });
 
       socket.on("disconnect", () => {
         cleanupFaceVideo("Disconnected");
+        stopRelayViewer("Disconnected");
       });
 
       socket.on("face_video_offer", async (offer) => {
@@ -234,6 +388,7 @@
 
       const leaveFaceScreen = () => {
         cleanupFaceVideo("Leaving page...");
+        stopRelayViewer("Leaving page...");
         if (socket.connected) {
           socket.emit("face_screen_leave");
         }
