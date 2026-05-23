@@ -761,8 +761,6 @@ const screenOn = document.getElementById("screenOn");
 const faceScreenToggle = document.getElementById("faceScreenToggle");
 const faceScreenStatus = document.getElementById("faceScreenStatus");
 const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
-const faceVideoStart = document.getElementById("faceVideoStart");
-const faceVideoStop = document.getElementById("faceVideoStop");
 const faceVideoStatus = document.getElementById("faceVideoStatus");
 const faceVideoPreview = document.getElementById("faceVideoPreview");
 const SYSTEM_REFRESH_MS = 10000;
@@ -774,6 +772,10 @@ let faceVideoLocalStream = null;
 let faceVideoActive = false;
 let faceVideoPublishing = false;
 let faceVideoPublisherId = null;
+let faceSessionStarting = false;
+let faceSessionStopping = false;
+let faceSessionActive = false;
+let faceScreenClientWaiters = [];
 const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function setSystemMessage(message, isError = false) {
@@ -853,6 +855,65 @@ function formatNetwork(network) {
   interfacesValue.textContent = compactInterfaces.length > 0 ? compactInterfaces.join("; ") : "Unknown";
 }
 
+function resolveFaceScreenClientWaiters(connected) {
+  if (!faceScreenClientWaiters.length) return;
+
+  const waiters = [...faceScreenClientWaiters];
+  faceScreenClientWaiters = [];
+
+  waiters.forEach(({ resolve, reject, timerId }) => {
+    clearTimeout(timerId);
+    if (connected) {
+      resolve();
+    } else {
+      reject(new Error("Face Screen client disconnected"));
+    }
+  });
+}
+
+function updateFaceScreenToggleButton() {
+  if (!faceScreenToggle) return;
+
+  if (faceSessionStarting) {
+    faceScreenToggle.textContent = "Starting...";
+    faceScreenToggle.disabled = true;
+    faceScreenToggle.classList.add("toggleBtn--danger");
+    return;
+  }
+
+  if (faceSessionStopping) {
+    faceScreenToggle.textContent = "Stopping...";
+    faceScreenToggle.disabled = true;
+    faceScreenToggle.classList.add("toggleBtn--danger");
+    return;
+  }
+
+  if (faceSessionActive) {
+    faceScreenToggle.textContent = "Hide Face";
+    faceScreenToggle.disabled = false;
+    faceScreenToggle.classList.add("toggleBtn--danger");
+  } else {
+    faceScreenToggle.textContent = "Show Face";
+    faceScreenToggle.disabled = false;
+    faceScreenToggle.classList.remove("toggleBtn--danger");
+  }
+}
+
+function waitForFaceScreenClient(timeoutMs = 10000) {
+  if (faceScreenClientConnected) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timerId = setTimeout(() => {
+      faceScreenClientWaiters = faceScreenClientWaiters.filter((entry) => entry.reject !== reject);
+      reject(new Error(`Face Screen client did not connect within ${Math.round(timeoutMs / 1000)} seconds`));
+    }, timeoutMs);
+
+    faceScreenClientWaiters.push({ resolve, reject, timerId });
+  });
+}
+
 function formatFaceScreen(faceScreen) {
   if (!faceScreenStatus || !faceScreenToggle) {
     return;
@@ -863,19 +924,15 @@ function formatFaceScreen(faceScreen) {
 
   if (isRunning) {
     faceScreenStatus.textContent = "Face Screen: Running";
-    faceScreenToggle.textContent = "Hide Face";
-    faceScreenToggle.classList.add("toggleBtn--danger");
   } else if (state === "inactive") {
     faceScreenStatus.textContent = "Face Screen: Stopped";
-    faceScreenToggle.textContent = "Show Face";
-    faceScreenToggle.classList.remove("toggleBtn--danger");
   } else {
     faceScreenStatus.textContent = "Face Screen: Unknown";
-    faceScreenToggle.textContent = "Show Face";
-    faceScreenToggle.classList.remove("toggleBtn--danger");
   }
 
   faceScreenRunning = isRunning;
+  faceSessionActive = faceScreenRunning && faceVideoActive;
+  updateFaceScreenToggleButton();
 }
 
 // Phase 4: derive warning flags + battery pill state from raw status data.
@@ -947,6 +1004,13 @@ function updateFaceScreenClientStatus(connected, message = "") {
   if (message && faceScreenStatus) {
     faceScreenStatus.textContent = `Face Screen: ${message}`;
   }
+
+  if (connected) {
+    resolveFaceScreenClientWaiters(true);
+  } else {
+    faceSessionActive = false;
+    updateFaceScreenToggleButton();
+  }
 }
 
 function setFaceVideoStatus(message, isError = false) {
@@ -984,6 +1048,8 @@ function stopFaceVideoLocally(statusMessage = "Face Video stopped") {
   stopFaceVideoLocalTracks();
   faceVideoActive = false;
   faceVideoPublishing = false;
+  faceSessionActive = false;
+  updateFaceScreenToggleButton();
   setFaceVideoStatus(statusMessage);
 }
 
@@ -1054,6 +1120,8 @@ async function startFaceVideo() {
       if (state === "connected") {
         faceVideoActive = true;
         faceVideoPublishing = false;
+        faceSessionActive = true;
+        updateFaceScreenToggleButton();
         setFaceVideoStatus("Face Video active");
       } else if (["failed", "disconnected", "closed"].includes(state)) {
         stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
@@ -1096,6 +1164,8 @@ async function startFaceVideo() {
     }));
     faceVideoActive = true;
     faceVideoPublishing = false;
+    faceSessionActive = true;
+    updateFaceScreenToggleButton();
     setFaceVideoStatus("Face Video publishing");
   } catch (err) {
     faceVideoPublishing = false;
@@ -1185,17 +1255,69 @@ async function postScreenControl(url, actionName) {
 }
 
 
-async function postFaceScreenToggle() {
-  const endpoint = faceScreenRunning ? "/system/face_screen_stop" : "/system/face_screen_start";
-  const actionName = faceScreenRunning ? "Hide Face" : "Show Face";
+async function startFaceSession() {
+  if (faceSessionStarting || faceSessionStopping || faceSessionActive) {
+    return;
+  }
+
+  faceSessionStarting = true;
+  updateFaceScreenToggleButton();
 
   try {
-    setSystemMessage(actionName + "...");
-    await fetchJsonOrThrow(endpoint, { method: "POST" });
-    setSystemMessage(actionName + " succeeded");
+    setSystemMessage("Show Face...");
+    setFaceVideoStatus("Starting...", false);
+    await fetchJsonOrThrow("/system/face_screen_start", { method: "POST" });
+    await refreshSystemStatusNow();
+    setSystemMessage("Waiting for Face Screen client...");
+    await waitForFaceScreenClient(10000);
+
+    await startFaceVideo();
+    if (!faceVideoActive) {
+      throw new Error("Face Video did not become active");
+    }
+
+    faceSessionActive = true;
+    setSystemMessage("Show Face succeeded");
+  } catch (err) {
+    await stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+    faceSessionActive = false;
+    setFaceVideoStatus("Face Video error: " + err.message, true);
+    setSystemMessage("Show Face failed: " + err.message, true);
+  } finally {
+    faceSessionStarting = false;
+    updateFaceScreenToggleButton();
+  }
+}
+
+async function stopFaceSession() {
+  if (faceSessionStopping || faceSessionStarting) {
+    return;
+  }
+
+  faceSessionStopping = true;
+  updateFaceScreenToggleButton();
+
+  try {
+    setSystemMessage("Hide Face...");
+    await stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+    await fetchJsonOrThrow("/system/face_screen_stop", { method: "POST" });
+    faceSessionActive = false;
+    setSystemMessage("Hide Face succeeded");
     await refreshSystemStatusNow();
   } catch (err) {
-    setSystemMessage(actionName + " failed: " + err.message, true);
+    setSystemMessage("Hide Face failed: " + err.message, true);
+  } finally {
+    faceSessionStopping = false;
+    updateFaceScreenToggleButton();
+  }
+}
+
+async function postFaceScreenToggle() {
+  if (faceSessionStarting || faceSessionStopping) return;
+  if (faceSessionActive || faceScreenRunning || faceVideoActive || faceVideoPublishing) {
+    await stopFaceSession();
+  } else {
+    await startFaceSession();
   }
 }
 
@@ -1204,12 +1326,6 @@ screenOff.addEventListener("click", () => postScreenControl("/system/screen_off"
 screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", "Screen on"));
 if (faceScreenToggle) {
   faceScreenToggle.addEventListener("click", postFaceScreenToggle);
-}
-if (faceVideoStart) {
-  faceVideoStart.addEventListener("click", startFaceVideo);
-}
-if (faceVideoStop) {
-  faceVideoStop.addEventListener("click", () => stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" }));
 }
 
 window.addEventListener("pagehide", () => {
