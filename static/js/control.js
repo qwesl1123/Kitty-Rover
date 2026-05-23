@@ -761,8 +761,6 @@ const screenOn = document.getElementById("screenOn");
 const faceScreenToggle = document.getElementById("faceScreenToggle");
 const faceScreenStatus = document.getElementById("faceScreenStatus");
 const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
-const faceVideoStart = document.getElementById("faceVideoStart");
-const faceVideoStop = document.getElementById("faceVideoStop");
 const faceVideoStatus = document.getElementById("faceVideoStatus");
 const faceVideoPreview = document.getElementById("faceVideoPreview");
 const SYSTEM_REFRESH_MS = 10000;
@@ -774,6 +772,9 @@ let faceVideoLocalStream = null;
 let faceVideoActive = false;
 let faceVideoPublishing = false;
 let faceVideoPublisherId = null;
+let faceSessionStarting = false;
+let faceSessionStopping = false;
+let faceSessionActive = false;
 const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function setSystemMessage(message, isError = false) {
@@ -876,6 +877,32 @@ function formatFaceScreen(faceScreen) {
   }
 
   faceScreenRunning = isRunning;
+  updateFaceSessionUi();
+}
+
+function updateFaceSessionState() {
+  faceSessionActive = faceScreenRunning && faceVideoActive;
+}
+
+function updateFaceSessionUi() {
+  if (!faceScreenToggle) {
+    return;
+  }
+
+  updateFaceSessionState();
+  let label = "Show Face";
+
+  if (faceSessionStarting) {
+    label = "Starting...";
+  } else if (faceSessionStopping) {
+    label = "Stopping...";
+  } else if (faceSessionActive) {
+    label = "Hide Face";
+  }
+
+  faceScreenToggle.textContent = label;
+  const shouldWarn = faceSessionStarting || faceSessionStopping || faceSessionActive || faceScreenRunning;
+  faceScreenToggle.classList.toggle("toggleBtn--danger", shouldWarn);
 }
 
 // Phase 4: derive warning flags + battery pill state from raw status data.
@@ -947,6 +974,8 @@ function updateFaceScreenClientStatus(connected, message = "") {
   if (message && faceScreenStatus) {
     faceScreenStatus.textContent = `Face Screen: ${message}`;
   }
+
+  updateFaceSessionUi();
 }
 
 function setFaceVideoStatus(message, isError = false) {
@@ -985,6 +1014,7 @@ function stopFaceVideoLocally(statusMessage = "Face Video stopped") {
   faceVideoActive = false;
   faceVideoPublishing = false;
   setFaceVideoStatus(statusMessage);
+  updateFaceSessionUi();
 }
 
 async function stopFaceVideo({ notify = true, statusMessage = "Face Video stopped" } = {}) {
@@ -1055,6 +1085,7 @@ async function startFaceVideo() {
         faceVideoActive = true;
         faceVideoPublishing = false;
         setFaceVideoStatus("Face Video active");
+        updateFaceSessionUi();
       } else if (["failed", "disconnected", "closed"].includes(state)) {
         stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
       }
@@ -1097,6 +1128,7 @@ async function startFaceVideo() {
     faceVideoActive = true;
     faceVideoPublishing = false;
     setFaceVideoStatus("Face Video publishing");
+    updateFaceSessionUi();
   } catch (err) {
     faceVideoPublishing = false;
     await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
@@ -1114,6 +1146,7 @@ if (socket) {
     if (!connected && (faceVideoActive || faceVideoPublishing)) {
       stopFaceVideo({ notify: true, statusMessage: "Face screen disconnected" });
     }
+    updateFaceSessionUi();
   });
 
   socket.on("face_video_status", (payload) => {
@@ -1136,6 +1169,28 @@ async function refreshFaceScreenClientStatus() {
   } catch (err) {
     updateFaceScreenClientStatus(false);
   }
+}
+
+function waitForFaceScreenClient(timeoutMs = 10000, intervalMs = 200) {
+  if (faceScreenClientConnected) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (faceScreenClientConnected) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        clearInterval(timer);
+        reject(new Error("Face Screen client did not connect within 10 seconds"));
+      }
+    }, intervalMs);
+  });
 }
 
 
@@ -1185,18 +1240,67 @@ async function postScreenControl(url, actionName) {
 }
 
 
-async function postFaceScreenToggle() {
-  const endpoint = faceScreenRunning ? "/system/face_screen_stop" : "/system/face_screen_start";
-  const actionName = faceScreenRunning ? "Hide Face" : "Show Face";
+async function startFaceSession() {
+  if (faceSessionStarting || faceSessionStopping || faceSessionActive) {
+    return;
+  }
 
   try {
-    setSystemMessage(actionName + "...");
-    await fetchJsonOrThrow(endpoint, { method: "POST" });
-    setSystemMessage(actionName + " succeeded");
+    faceSessionStarting = true;
+    setFaceVideoStatus("Face Video starting...");
+    setSystemMessage("Show Face...");
+    updateFaceSessionUi();
+
+    await fetchJsonOrThrow("/system/face_screen_start", { method: "POST" });
     await refreshSystemStatusNow();
+    await waitForFaceScreenClient(10000);
+    await startFaceVideo();
+
+    if (!faceVideoActive) {
+      throw new Error("Face Video did not become active");
+    }
+
+    setSystemMessage("Show Face succeeded");
   } catch (err) {
-    setSystemMessage(actionName + " failed: " + err.message, true);
+    await stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+    setFaceVideoStatus("Face session error: " + err.message, true);
+    setSystemMessage("Show Face failed: " + err.message, true);
+  } finally {
+    faceSessionStarting = false;
+    await refreshSystemStatusNow();
+    updateFaceSessionUi();
   }
+}
+
+async function stopFaceSession() {
+  if (faceSessionStopping) {
+    return;
+  }
+
+  try {
+    faceSessionStopping = true;
+    updateFaceSessionUi();
+    setSystemMessage("Hide Face...");
+
+    await stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
+    await fetchJsonOrThrow("/system/face_screen_stop", { method: "POST" });
+    setSystemMessage("Hide Face succeeded");
+  } catch (err) {
+    setSystemMessage("Hide Face failed: " + err.message, true);
+  } finally {
+    faceSessionStopping = false;
+    await refreshSystemStatusNow();
+    updateFaceSessionUi();
+  }
+}
+
+async function postFaceScreenToggle() {
+  updateFaceSessionState();
+  if (faceSessionActive || faceScreenRunning || faceSessionStopping) {
+    await stopFaceSession();
+    return;
+  }
+  await startFaceSession();
 }
 
 refreshSystemStatus.addEventListener("click", refreshSystemStatusNow);
@@ -1205,13 +1309,6 @@ screenOn.addEventListener("click", () => postScreenControl("/system/screen_on", 
 if (faceScreenToggle) {
   faceScreenToggle.addEventListener("click", postFaceScreenToggle);
 }
-if (faceVideoStart) {
-  faceVideoStart.addEventListener("click", startFaceVideo);
-}
-if (faceVideoStop) {
-  faceVideoStop.addEventListener("click", () => stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" }));
-}
-
 window.addEventListener("pagehide", () => {
   stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
 });
