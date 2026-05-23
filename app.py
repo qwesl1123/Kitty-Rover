@@ -4,6 +4,13 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
 from rover.webrtc_audio import close_audio_peer_sync, get_audio_status, handle_audio_offer_sync
+from rover.webrtc_face_video import (
+    close_face_video_publisher_sync,
+    close_face_video_viewer_sync,
+    get_face_video_status,
+    handle_face_video_publish_offer_sync,
+    handle_face_video_view_offer_sync,
+)
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
 from rover.system_control import (
     face_screen_start,
@@ -110,6 +117,82 @@ def webrtc_audio_close():
 def webrtc_audio_status():
     return jsonify(get_audio_status())
 
+
+
+
+@app.route("/webrtc/face_video/publish_offer", methods=["POST"])
+def webrtc_face_video_publish_offer():
+    offer_json = request.get_json(silent=True)
+    if not offer_json:
+        return jsonify({"ok": False, "error": "missing JSON SDP offer"}), 400
+
+    try:
+        result = handle_face_video_publish_offer_sync(offer_json)
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("[face-video] failed to handle publisher SDP offer")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    if not result.get("ok") and result.get("code") == "publisher_exists":
+        return jsonify(result), 409
+
+    return jsonify(result), 200
+
+
+@app.route("/webrtc/face_video/publish_close", methods=["POST"])
+def webrtc_face_video_publish_close():
+    data = request.get_json(silent=True) or {}
+    publisher_id = data.get("publisher_id")
+
+    try:
+        result = close_face_video_publisher_sync(publisher_id)
+    except Exception as err:
+        app.logger.exception("[face-video] failed to close publisher")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    return jsonify(result)
+
+
+@app.route("/webrtc/face_video/view_offer", methods=["POST"])
+def webrtc_face_video_view_offer():
+    offer_json = request.get_json(silent=True)
+    if not offer_json:
+        return jsonify({"ok": False, "error": "missing JSON SDP offer"}), 400
+
+    try:
+        result = handle_face_video_view_offer_sync(offer_json)
+    except ValueError as err:
+        return jsonify({"ok": False, "error": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("[face-video] failed to handle viewer SDP offer")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    if not result.get("ok") and result.get("code") == "no_publisher":
+        return jsonify(result), 409
+
+    return jsonify(result), 200
+
+
+@app.route("/webrtc/face_video/view_close", methods=["POST"])
+def webrtc_face_video_view_close():
+    data = request.get_json(silent=True) or {}
+    viewer_id = data.get("viewer_id")
+    if not viewer_id:
+        return jsonify({"ok": False, "error": "missing viewer_id"}), 400
+
+    try:
+        result = close_face_video_viewer_sync(viewer_id)
+    except Exception as err:
+        app.logger.exception("[face-video] failed to close viewer")
+        return jsonify({"ok": False, "error": str(err)}), 500
+
+    return jsonify(result)
+
+
+@app.route("/webrtc/face_video/status")
+def webrtc_face_video_status():
+    return jsonify(get_face_video_status())
 
 @app.route("/status")
 def status():
