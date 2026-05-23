@@ -769,10 +769,11 @@ const SYSTEM_REFRESH_MS = 10000;
 
 let faceScreenRunning = false;
 let faceScreenClientConnected = false;
-let faceVideoPc = null;
+let faceVideoPublishPc = null;
 let faceVideoLocalStream = null;
 let faceVideoActive = false;
-let faceVideoPendingRemoteIce = [];
+let faceVideoPublishing = false;
+let faceVideoPublisherId = null;
 const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function setSystemMessage(message, isError = false) {
@@ -969,38 +970,49 @@ function stopFaceVideoLocalTracks() {
   clearFaceVideoPreview();
 }
 
-function closeFaceVideoPeer() {
-  if (faceVideoPc) {
-    faceVideoPc.onicecandidate = null;
-    faceVideoPc.onconnectionstatechange = null;
-    faceVideoPc.oniceconnectionstatechange = null;
-    faceVideoPc.close();
+function closeFaceVideoPublishPeer() {
+  if (faceVideoPublishPc) {
+    faceVideoPublishPc.onconnectionstatechange = null;
+    faceVideoPublishPc.oniceconnectionstatechange = null;
+    faceVideoPublishPc.close();
   }
-  faceVideoPc = null;
-  faceVideoPendingRemoteIce = [];
+  faceVideoPublishPc = null;
 }
 
 function stopFaceVideoLocally(statusMessage = "Face Video stopped") {
-  closeFaceVideoPeer();
+  closeFaceVideoPublishPeer();
   stopFaceVideoLocalTracks();
   faceVideoActive = false;
+  faceVideoPublishing = false;
   setFaceVideoStatus(statusMessage);
 }
 
 async function stopFaceVideo({ notify = true, statusMessage = "Face Video stopped" } = {}) {
+  const publisherIdToClose = faceVideoPublisherId;
   stopFaceVideoLocally(statusMessage);
-  if (notify && socket) {
-    socket.emit("face_video_stop");
+  faceVideoPublisherId = null;
+
+  if (notify && publisherIdToClose) {
+    try {
+      await fetch("/webrtc/face_video/publish_close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publisher_id: publisherIdToClose }),
+        keepalive: true,
+      });
+    } catch (err) {
+      console.log("Face Video publish_close failed", err);
+    }
   }
 }
 
 async function startFaceVideo() {
-  if (!socket) {
-    setFaceVideoStatus("Face Video error: Socket unavailable", true);
-    return;
-  }
   if (!faceScreenClientConnected) {
     setFaceVideoStatus("Face Screen not connected. Click Show Face first.", true);
+    return;
+  }
+  if (faceVideoPublishing) {
+    setFaceVideoStatus("Face Video already publishing");
     return;
   }
 
@@ -1009,7 +1021,8 @@ async function startFaceVideo() {
     return;
   }
 
-  await stopFaceVideo({ notify: false, statusMessage: "Face Video connecting..." });
+  await stopFaceVideo({ notify: true, statusMessage: "Face Video connecting..." });
+  faceVideoPublishing = true;
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -1030,44 +1043,62 @@ async function startFaceVideo() {
       faceVideoPreview.play().catch(() => {});
     }
 
-    faceVideoPc = new RTCPeerConnection(faceVideoRtcConfig);
-    stream.getVideoTracks().forEach((track) => faceVideoPc.addTrack(track, stream));
+    faceVideoPublishPc = new RTCPeerConnection(faceVideoRtcConfig);
+    stream.getVideoTracks().forEach((track) => faceVideoPublishPc.addTrack(track, stream));
 
-    faceVideoPc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("face_video_ice", { candidate: event.candidate, target: "face_screen" });
-      }
-    };
-
-    faceVideoPc.onconnectionstatechange = () => {
-      if (!faceVideoPc) return;
-      const state = faceVideoPc.connectionState;
+    faceVideoPublishPc.onconnectionstatechange = () => {
+      if (!faceVideoPublishPc) return;
+      const state = faceVideoPublishPc.connectionState;
       console.log("Face Video connectionState:", state);
       setFaceVideoStatus("Face Video connectionState: " + state, ["failed", "disconnected", "closed"].includes(state));
       if (state === "connected") {
         faceVideoActive = true;
+        faceVideoPublishing = false;
         setFaceVideoStatus("Face Video active");
       } else if (["failed", "disconnected", "closed"].includes(state)) {
-        stopFaceVideoLocally("Face Video stopped");
+        stopFaceVideo({ notify: true, statusMessage: "Face Video stopped" });
       }
     };
 
-    faceVideoPc.oniceconnectionstatechange = () => {
-      if (!faceVideoPc) return;
-      const state = faceVideoPc.iceConnectionState;
+    faceVideoPublishPc.oniceconnectionstatechange = () => {
+      if (!faceVideoPublishPc) return;
+      const state = faceVideoPublishPc.iceConnectionState;
       console.log("Face Video iceConnectionState:", state);
       setFaceVideoStatus("Face Video iceConnectionState: " + state, state === "failed");
     };
 
-    const offer = await faceVideoPc.createOffer();
+    const offer = await faceVideoPublishPc.createOffer();
     console.log("Face Video: offer created");
     setFaceVideoStatus("Face Video offer created");
-    await faceVideoPc.setLocalDescription(offer);
-    await waitForIceGatheringComplete(faceVideoPc);
-    socket.emit("face_video_offer", faceVideoPc.localDescription);
-    console.log("Face Video: offer sent");
-    setFaceVideoStatus("Face Video offer sent");
+    await faceVideoPublishPc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(faceVideoPublishPc);
+
+    const response = await fetch("/webrtc/face_video/publish_offer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(faceVideoPublishPc.localDescription),
+    });
+    const payload = await response.json();
+    if (response.status === 409) {
+      throw new Error(payload?.error || "Face Video publisher already active");
+    }
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `Face Video publish failed with HTTP ${response.status}`);
+    }
+    if (!payload?.sdp || !payload?.type || !payload?.publisher_id) {
+      throw new Error("Face Video publish response missing sdp/type/publisher_id");
+    }
+
+    faceVideoPublisherId = payload.publisher_id;
+    await faceVideoPublishPc.setRemoteDescription(new RTCSessionDescription({
+      sdp: payload.sdp,
+      type: payload.type,
+    }));
+    faceVideoActive = true;
+    faceVideoPublishing = false;
+    setFaceVideoStatus("Face Video publishing");
   } catch (err) {
+    faceVideoPublishing = false;
     await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
     if (faceVideoStatus) {
       faceVideoStatus.classList.add("error");
@@ -1080,40 +1111,8 @@ if (socket) {
     const connected = Boolean(payload && payload.connected);
     const message = payload && payload.message ? String(payload.message) : "";
     updateFaceScreenClientStatus(connected, message);
-    if (!connected && faceVideoActive) {
-      stopFaceVideoLocally("Face screen disconnected");
-    }
-  });
-
-  socket.on("face_video_answer", async (answer) => {
-    if (!faceVideoPc || !answer || answer.type !== "answer" || !answer.sdp) {
-      return;
-    }
-    try {
-      await faceVideoPc.setRemoteDescription(new RTCSessionDescription(answer));
-      while (faceVideoPendingRemoteIce.length > 0) {
-        await faceVideoPc.addIceCandidate(faceVideoPendingRemoteIce.shift());
-      }
-      console.log("Face Video: answer received");
-      setFaceVideoStatus("Face Video answer received");
-    } catch (err) {
-      await stopFaceVideo({ notify: false, statusMessage: "Face Video error: " + err.message });
-    }
-  });
-
-  socket.on("face_video_ice", async (payload) => {
-    if (!faceVideoPc || !payload || !payload.candidate) {
-      return;
-    }
-    try {
-      if (!faceVideoPc.remoteDescription) {
-        faceVideoPendingRemoteIce.push(payload.candidate);
-        setFaceVideoStatus("Face Video ICE queued");
-        return;
-      }
-      await faceVideoPc.addIceCandidate(payload.candidate);
-    } catch (err) {
-      setFaceVideoStatus("Face Video ICE error: " + err.message, true);
+    if (!connected && (faceVideoActive || faceVideoPublishing)) {
+      stopFaceVideo({ notify: true, statusMessage: "Face screen disconnected" });
     }
   });
 

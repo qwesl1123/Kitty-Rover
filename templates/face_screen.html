@@ -66,7 +66,7 @@
 <body>
   <video id="faceVideo" autoplay muted playsinline></video>
   <main class="wrap" role="main" aria-live="polite">
-    <h1>Waiting for face video...</h1>
+    <h1>Waiting for phone camera...</h1>
     <p class="sub">Rover Face Screen Ready</p>
     <p id="faceScreenConnectionStatus" class="status">Connecting to rover server...</p>
   </main>
@@ -77,9 +77,7 @@
     const faceVideo = document.getElementById("faceVideo");
     const socket = typeof io === "function" ? io() : null;
     const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-    let faceVideoPc = null;
-    let remoteStream = null;
-    let remoteIceQueue = [];
+
     let relayViewerPc = null;
     let relayViewerId = null;
     let relayViewerRetryTimer = null;
@@ -92,7 +90,7 @@
     if (!socket) {
       setStatus("Disconnected");
     } else {
-      function showWaiting(statusText = "Waiting for controller...") {
+      function showWaiting(statusText = "Waiting for phone camera...") {
         document.body.classList.remove("video-active");
         setStatus(statusText);
       }
@@ -122,19 +120,6 @@
           };
           pc.addEventListener("icegatheringstatechange", onStateChange);
         });
-      }
-
-      function cleanupFaceVideo(statusText = "Waiting for controller...") {
-        if (faceVideoPc) {
-          faceVideoPc.ontrack = null;
-          faceVideoPc.onicecandidate = null;
-          faceVideoPc.close();
-        }
-        faceVideoPc = null;
-        remoteStream = null;
-        faceVideo.pause();
-        faceVideo.srcObject = null;
-        showWaiting(statusText);
       }
 
       function clearRelayRetryTimer() {
@@ -208,6 +193,18 @@
               ? event.streams[0]
               : new MediaStream([event.track]);
             faceVideo.srcObject = stream;
+
+            // Belt-and-suspenders: if the publisher goes away and the
+            // server-side socket notification is delayed or missed, the
+            // track 'ended' event will usually fire faster than ICE
+            // consent-freshness timeout.
+            event.track.addEventListener("ended", () => {
+              setStatus("Remote track ended");
+              stopRelayViewer("Phone camera stopped").finally(() => {
+                scheduleRelayViewerRetry("Waiting for phone camera...");
+              });
+            });
+
             faceVideo.play().catch((err) => {
               setStatus("Relay viewer failed: " + err.message);
             });
@@ -285,44 +282,6 @@
         }
       }
 
-      async function prepareFaceVideoPeer() {
-        if (faceVideoPc) {
-          cleanupFaceVideo("Restarting face video...");
-        }
-
-        faceVideoPc = new RTCPeerConnection(rtcConfig);
-        remoteIceQueue = [];
-        remoteStream = new MediaStream();
-        faceVideo.srcObject = remoteStream;
-
-        faceVideoPc.ontrack = (event) => {
-          setStatus("Face video remote track received");
-          event.streams[0]?.getTracks().forEach((track) => remoteStream.addTrack(track));
-          if (!event.streams[0]) {
-            remoteStream.addTrack(event.track);
-          }
-          faceVideo.play().catch((err) => {
-            showWaiting("Face video play error: " + err.message);
-          });
-        };
-
-        faceVideoPc.onicecandidate = (event) => {
-          if (event.candidate) {
-            socket.emit("face_video_ice", { candidate: event.candidate, target: "controller" });
-          }
-        };
-
-        faceVideoPc.onconnectionstatechange = () => {
-          if (!faceVideoPc) return;
-          setStatus("Face video connectionState: " + faceVideoPc.connectionState);
-        };
-
-        faceVideoPc.oniceconnectionstatechange = () => {
-          if (!faceVideoPc) return;
-          setStatus("Face video iceConnectionState: " + faceVideoPc.iceConnectionState);
-        };
-      }
-
       faceVideo.addEventListener("loadeddata", () => {
         setStatus("Face video loadeddata");
         showVideo();
@@ -334,60 +293,25 @@
       });
 
       socket.on("connect", () => {
-        setStatus("Connected to rover server · Waiting for controller...");
+        setStatus("Connected to rover server · Waiting for phone camera...");
         socket.emit("face_screen_join");
         startRelayViewer();
       });
 
       socket.on("disconnect", () => {
-        cleanupFaceVideo("Disconnected");
         stopRelayViewer("Disconnected");
       });
 
-      socket.on("face_video_offer", async (offer) => {
-        if (!offer || offer.type !== "offer" || !offer.sdp) {
-          return;
-        }
-
-        try {
-          setStatus("Face video offer received");
-          await prepareFaceVideoPeer();
-          await faceVideoPc.setRemoteDescription(new RTCSessionDescription(offer));
-          while (remoteIceQueue.length > 0) {
-            await faceVideoPc.addIceCandidate(remoteIceQueue.shift());
-          }
-          const answer = await faceVideoPc.createAnswer();
-          await faceVideoPc.setLocalDescription(answer);
-          await waitForIceGatheringComplete(faceVideoPc);
-          socket.emit("face_video_answer", faceVideoPc.localDescription);
-          setStatus("Face video answer sent");
-        } catch (err) {
-          cleanupFaceVideo("Face video error: " + err.message);
-        }
-      });
-
-      socket.on("face_video_ice", async (payload) => {
-        if (!faceVideoPc || !payload || !payload.candidate) {
-          return;
-        }
-        try {
-          if (!faceVideoPc.remoteDescription) {
-            remoteIceQueue.push(payload.candidate);
-            setStatus("Face video ICE queued (waiting for remote description)");
-            return;
-          }
-          await faceVideoPc.addIceCandidate(payload.candidate);
-        } catch (err) {
-          setStatus("ICE error: " + err.message);
-        }
-      });
-
-      socket.on("face_video_stop", () => {
-        cleanupFaceVideo("Waiting for controller...");
+      // Server-pushed notification: publisher (phone) went away. Tear down
+      // the relay viewer immediately instead of waiting 10-30s for the
+      // WebRTC stack to notice via ICE consent-freshness timeout.
+      socket.on("face_video_publisher_offline", () => {
+        stopRelayViewer("Phone camera stopped").finally(() => {
+          scheduleRelayViewerRetry("Waiting for phone camera...");
+        });
       });
 
       const leaveFaceScreen = () => {
-        cleanupFaceVideo("Leaving page...");
         stopRelayViewer("Leaving page...");
         if (socket.connected) {
           socket.emit("face_screen_leave");
