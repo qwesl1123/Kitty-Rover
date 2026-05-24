@@ -66,11 +66,20 @@
         </div>
 
         <div class="cameraControls">
-            <button id="camToggle" class="toggleBtn toggleBtn--cam">
-                <span class="toggleBtn__label toggleBtn__label--camOff">Start Camera</span>
-                <span class="toggleBtn__label toggleBtn__label--camOn">Stop Camera</span>
+            <button id="camToggle" class="iconBtn iconBtn--cam" aria-label="Start camera">
+                <svg class="iconBtn__svg iconBtn__svg--off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="2" y1="2" x2="22" y2="22" />
+                    <path d="m22 8-6 4 6 4V8Z" />
+                    <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
+                </svg>
+                <svg class="iconBtn__svg iconBtn__svg--on" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m22 8-6 4 6 4V8Z" />
+                    <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
+                </svg>
             </button>
-            <button id="faceScreenToggle" class="iconBtn iconBtn--face" aria-label="Toggle face screen">
+            <button id="faceScreenToggle" class="iconBtn iconBtn--face" aria-label="Show face screen">
                 <svg class="iconBtn__svg iconBtn__svg--off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <line x1="2" y1="2" x2="22" y2="22" />

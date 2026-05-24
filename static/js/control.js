@@ -14,8 +14,10 @@ const backVideo = document.getElementById("backVideo");
 camToggle.addEventListener("click", () => {
   if (video.hasAttribute("src")) {
     video.removeAttribute("src");
+    camToggle.setAttribute("aria-label", "Start camera");
   } else {
     video.src = "/video_feed?t=" + Date.now();
+    camToggle.setAttribute("aria-label", "Stop camera");
   }
 });
 

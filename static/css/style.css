@@ -237,7 +237,7 @@ audio {
 .cameraSection:has(img[src]) .cameraStage::before { display: none; }
 .cameraSection:not(:has(img[src])) .cameraStage img { visibility: hidden; }
 
-/* ---- Control row: 2 text toggles + 3 icon toggles ---- */
+/* ---- Control row: 1 text toggle (audio) + 4 icon toggles (cam, face, listen, talk) ---- */
 .cameraControls {
   display: flex;
   flex-wrap: wrap;
@@ -447,6 +447,21 @@ body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--on { display: inl
 body[data-face-state="active"] .iconBtn--face,
 body[data-face-state="starting"] .iconBtn--face,
 body[data-face-state="stopping"] .iconBtn--face {
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ---- Front camera icon button (mirrors iconBtn--face state pattern) ----
+   Uses :has(img[src]) on the FRONT cameraSection only — back camera keeps
+   its toggleBtn pattern. */
+.iconBtn--cam .iconBtn__svg--on { display: none; }
+.iconBtn--cam .iconBtn__svg--off { display: inline-block; }
+
+.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--off { display: none; }
+.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--on { display: inline-block; }
+
+.cameraSection:has(img[src]) .iconBtn--cam {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
   background: rgba(239, 68, 68, 0.08);
