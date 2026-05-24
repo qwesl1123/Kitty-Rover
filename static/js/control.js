@@ -762,6 +762,7 @@ const faceScreenStatus = document.getElementById("faceScreenStatus");
 const faceScreenClientStatus = document.getElementById("faceScreenClientStatus");
 const faceVideoStatus = document.getElementById("faceVideoStatus");
 const faceVideoPreview = document.getElementById("faceVideoPreview");
+const faceVideoContainer = document.getElementById("faceVideoContainer");
 const SYSTEM_REFRESH_MS = 10000;
 
 let faceScreenRunning = false;
@@ -776,6 +777,78 @@ let faceSessionStopping = false;
 let faceSessionActive = false;
 let faceScreenClientWaiters = [];
 const faceVideoRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+// Make the face video PiP draggable (FaceTime-style). Once user drags, the
+// container becomes left/top-anchored; before then it sits at the CSS default
+// (top + right). Position is clamped to viewport, and re-clamped on resize.
+if (faceVideoContainer) {
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let elemStartLeft = 0;
+  let elemStartTop = 0;
+  let isDragging = false;
+  let userPositioned = false;
+
+  faceVideoContainer.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    isDragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    const rect = faceVideoContainer.getBoundingClientRect();
+    elemStartLeft = rect.left;
+    elemStartTop = rect.top;
+    // Swap from right-anchored (CSS default) to left/top-anchored on first drag.
+    faceVideoContainer.style.right = "auto";
+    faceVideoContainer.style.bottom = "auto";
+    faceVideoContainer.style.left = elemStartLeft + "px";
+    faceVideoContainer.style.top = elemStartTop + "px";
+    faceVideoContainer.setPointerCapture(event.pointerId);
+    faceVideoContainer.classList.add("dragging");
+    userPositioned = true;
+  });
+
+  faceVideoContainer.addEventListener("pointermove", (event) => {
+    if (!isDragging) return;
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    const rect = faceVideoContainer.getBoundingClientRect();
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    const newLeft = Math.max(0, Math.min(maxLeft, elemStartLeft + dx));
+    const newTop = Math.max(0, Math.min(maxTop, elemStartTop + dy));
+    faceVideoContainer.style.left = newLeft + "px";
+    faceVideoContainer.style.top = newTop + "px";
+  });
+
+  const endDrag = (event) => {
+    if (!isDragging) return;
+    isDragging = false;
+    if (faceVideoContainer.hasPointerCapture(event.pointerId)) {
+      faceVideoContainer.releasePointerCapture(event.pointerId);
+    }
+    faceVideoContainer.classList.remove("dragging");
+  };
+
+  faceVideoContainer.addEventListener("pointerup", endDrag);
+  faceVideoContainer.addEventListener("pointercancel", endDrag);
+
+  // Re-clamp on viewport resize / orientation change so the PiP can't end up
+  // stranded offscreen if the user rotates their phone.
+  window.addEventListener("resize", () => {
+    if (!userPositioned || !faceVideoContainer.classList.contains("visible")) return;
+    const rect = faceVideoContainer.getBoundingClientRect();
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    const clampedLeft = Math.max(0, Math.min(maxLeft, rect.left));
+    const clampedTop = Math.max(0, Math.min(maxTop, rect.top));
+    if (clampedLeft !== rect.left) {
+      faceVideoContainer.style.left = clampedLeft + "px";
+    }
+    if (clampedTop !== rect.top) {
+      faceVideoContainer.style.top = clampedTop + "px";
+    }
+  });
+}
 
 function setSystemMessage(message, isError = false) {
   systemStatusMessage.textContent = message;
@@ -1022,7 +1095,9 @@ function clearFaceVideoPreview() {
   if (!faceVideoPreview) return;
   faceVideoPreview.pause();
   faceVideoPreview.srcObject = null;
-  faceVideoPreview.style.display = "none";
+  if (faceVideoContainer) {
+    faceVideoContainer.classList.remove("visible");
+  }
 }
 
 function stopFaceVideoLocalTracks() {
@@ -1104,7 +1179,9 @@ async function startFaceVideo() {
     setFaceVideoStatus("Face Video camera acquired");
     if (faceVideoPreview) {
       faceVideoPreview.srcObject = stream;
-      faceVideoPreview.style.display = "block";
+      if (faceVideoContainer) {
+        faceVideoContainer.classList.add("visible");
+      }
       faceVideoPreview.play().catch(() => {});
     }
 

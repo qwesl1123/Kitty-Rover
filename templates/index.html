@@ -151,11 +151,14 @@
 
         <div class="faceScreenBody">
             <button id="faceScreenToggle" class="toggleBtn toggleBtn--face">Show Face</button>
-            <video id="faceVideoPreview" muted playsinline
-                style="display:none;width:350px;max-width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;margin-top:0.75rem;"></video>
-            <p id="faceScreenStatus" class="fallbackStatus">Face Screen: Unknown</p>
-            <p id="faceScreenClientStatus" class="fallbackStatus">Face Screen Client: Not Connected</p>
-            <p id="faceVideoStatus" class="fallbackStatus">Face Video stopped</p>
+            <div class="faceVideoContainer" id="faceVideoContainer">
+                <video id="faceVideoPreview" muted playsinline></video>
+                <div class="faceVideoOverlay" aria-hidden="true">
+                    <p id="faceScreenStatus" class="faceVideoOverlay__line">Face Screen: Unknown</p>
+                    <p id="faceScreenClientStatus" class="faceVideoOverlay__line">Face Screen Client: Not Connected</p>
+                    <p id="faceVideoStatus" class="faceVideoOverlay__line">Face Video stopped</p>
+                </div>
+            </div>
         </div>
     </section>
 

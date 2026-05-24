@@ -466,6 +466,71 @@ audio {
   color: var(--signal-stop);
 }
 
+/* ---- Face video floating PiP (FaceTime-style draggable) ---- */
+.faceVideoContainer {
+  display: none;
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top, 16px));
+  right: max(16px, env(safe-area-inset-right, 16px));
+  width: clamp(220px, 45vw, 300px);
+  aspect-ratio: 16 / 9;
+  z-index: 90;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow 0.15s ease;
+}
+
+.faceVideoContainer.visible {
+  display: block;
+}
+
+.faceVideoContainer.dragging {
+  cursor: grabbing;
+  transition: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+
+.faceVideoContainer video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.faceVideoOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4px 6px 5px;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.3;
+  color: #000;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.faceVideoOverlay__line {
+  margin: 0;
+  min-height: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #000;
+}
+
 @media (min-width: 760px) {
   .faceScreenSection {
     width: auto;
