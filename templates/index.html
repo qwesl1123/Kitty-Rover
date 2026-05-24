@@ -115,14 +115,32 @@
         <p id="webrtcStatus" class="audioStatusLine statusMessage">Disconnected</p>
     </section>
 
-    <section class="panel backCameraPanel">
-        <h2>Back Camera</h2>
-        <div class="cameraStage backCameraStage">
+    <section class="cameraSection">
+        <header class="cameraHeader">
+            <h2 class="srOnly">Back Camera</h2>
+            <div class="statusBar" aria-live="polite">
+                <span class="statusItem statusItem--camera">
+                    <svg class="statusItem__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m22 8-6 4 6 4V8Z" />
+                        <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
+                    </svg>
+                    <span class="statusItem__dot"></span>
+                    <span class="statusItem__label statusItem__label--camOff">Back Offline</span>
+                    <span class="statusItem__label statusItem__label--camOn">Back Live</span>
+                </span>
+            </div>
+        </header>
+
+        <div class="cameraStage">
             <img id="backVideo" alt="Rover back camera">
         </div>
-        <div class="backCameraControls">
-            <button id="startBackCam" class="toggleBtn">Start Back Camera</button>
-            <button id="stopBackCam" class="toggleBtn">Stop Back Camera</button>
+
+        <div class="cameraControls">
+            <button id="backCamToggle" class="toggleBtn toggleBtn--cam">
+                <span class="toggleBtn__label toggleBtn__label--camOff">Start Back Camera</span>
+                <span class="toggleBtn__label toggleBtn__label--camOn">Stop Back Camera</span>
+            </button>
         </div>
     </section>
     <section class="faceScreenSection">

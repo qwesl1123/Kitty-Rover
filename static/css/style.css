@@ -157,13 +157,13 @@ audio {
 
 .statusItem__label { white-space: nowrap; }
 
-/* ---- Status: camera state (driven by #video[src]) ---- */
+/* ---- Status: camera state (driven by any img[src] inside the section) ---- */
 .statusItem__label--camOn { display: none; }
 .statusItem__label--camOff { display: inline; }
-.cameraSection:has(#video[src]) .statusItem__label--camOff { display: none; }
-.cameraSection:has(#video[src]) .statusItem__label--camOn { display: inline; color: var(--signal-live); }
-.cameraSection:has(#video[src]) .statusItem--camera .statusItem__icon { color: var(--signal-live); }
-.cameraSection:has(#video[src]) .statusItem--camera .statusItem__dot {
+.cameraSection:has(img[src]) .statusItem__label--camOff { display: none; }
+.cameraSection:has(img[src]) .statusItem__label--camOn { display: inline; color: var(--signal-live); }
+.cameraSection:has(img[src]) .statusItem--camera .statusItem__icon { color: var(--signal-live); }
+.cameraSection:has(img[src]) .statusItem--camera .statusItem__dot {
   background: var(--signal-live);
   animation: liveDotPulse 1.8s ease-in-out infinite;
 }
@@ -234,35 +234,8 @@ audio {
   display: block;
 }
 
-.cameraSection:has(#video[src]) .cameraStage::before { display: none; }
-.cameraSection:not(:has(#video[src])) #video { visibility: hidden; }
-
-.backCameraPanel .backCameraStage {
-  width: 100%;
-  max-width: 640px;
-  margin-bottom: 10px;
-}
-
-.backCameraPanel .backCameraStage #backVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.backCameraPanel .backCameraControls {
-  display: flex;
-  gap: 8px;
-  max-width: 640px;
-}
-
-.backCameraPanel .backCameraControls .toggleBtn {
-  flex: 1;
-}
-
-.backCameraPanel .backCameraStage:not(:has(#backVideo[src])) #backVideo {
-  visibility: hidden;
-}
+.cameraSection:has(img[src]) .cameraStage::before { display: none; }
+.cameraSection:not(:has(img[src])) .cameraStage img { visibility: hidden; }
 
 /* ---- Control row: 2 text toggles + 2 icon toggles ---- */
 .cameraControls {
@@ -303,12 +276,12 @@ audio {
 }
 
 /* Camera toggle "active" treatment (red — pressing stops the stream) */
-.cameraSection:has(#video[src]) .toggleBtn--cam {
+.cameraSection:has(img[src]) .toggleBtn--cam {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
 }
-.cameraSection:has(#video[src]) .toggleBtn--cam:hover,
-.cameraSection:has(#video[src]) .toggleBtn--cam:active {
+.cameraSection:has(img[src]) .toggleBtn--cam:hover,
+.cameraSection:has(img[src]) .toggleBtn--cam:active {
   background: rgba(239, 68, 68, 0.10);
   border-color: var(--signal-stop);
   color: var(--signal-stop);
@@ -331,8 +304,8 @@ audio {
 
 /* Label swap (camera) */
 .toggleBtn__label--camOn { display: none; }
-.cameraSection:has(#video[src]) .toggleBtn__label--camOff { display: none; }
-.cameraSection:has(#video[src]) .toggleBtn__label--camOn { display: inline; }
+.cameraSection:has(img[src]) .toggleBtn__label--camOff { display: none; }
+.cameraSection:has(img[src]) .toggleBtn__label--camOn { display: inline; }
 
 /* Label swap (audio): "Link Audio" until connected/connecting */
 .toggleBtn__label--audioOn { display: none; }
