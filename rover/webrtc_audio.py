@@ -25,7 +25,7 @@ os.environ.setdefault("ALSA_CONFIG_PATH", "/usr/share/alsa/alsa.conf")
 MIC_DEVICE = "plughw:0,0"
 SPEAKER_DEVICE = "plughw:0,0"
 
-INCOMING_TALK_GAIN = 3.5
+INCOMING_TALK_GAIN = 5.0
 
 
 class GainAudioTrack(MediaStreamTrack):

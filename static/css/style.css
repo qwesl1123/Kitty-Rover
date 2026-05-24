@@ -532,18 +532,28 @@ audio {
   color: #000;
 }
 
-/* CLI-style blinking cursor on the last log line */
+/* CLI-style blinking cursor on the last log line.
+   Bulletproof variant: visibility-based + step-end timing instead of opacity
+   with steps(N, jump-none). Survives iOS Low Power Mode throttling better,
+   doesn't depend on jump-none parser support (older Safari), and respects
+   prefers-reduced-motion. */
 .faceVideoOverlay__line--tail::after {
   content: "_";
   display: inline-block;
   margin-left: 1px;
-  animation: cliCursorBlink 1s steps(2, jump-none) infinite;
+  animation: cliCursorBlink 1.06s step-end infinite;
 }
 
 @keyframes cliCursorBlink {
-  0%   { opacity: 1; }
-  50%  { opacity: 0; }
-  100% { opacity: 1; }
+  from, 49.9% { visibility: visible; }
+  50%, to     { visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faceVideoOverlay__line--tail::after {
+    animation: none;
+    visibility: visible;
+  }
 }
 
 @media (min-width: 760px) {
