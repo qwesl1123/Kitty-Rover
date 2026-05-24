@@ -946,29 +946,17 @@ function resolveFaceScreenClientWaiters(connected) {
 function updateFaceScreenToggleButton() {
   if (!faceScreenToggle) return;
 
-  if (faceSessionStarting) {
-    faceScreenToggle.textContent = "Starting...";
-    faceScreenToggle.disabled = true;
-    faceScreenToggle.classList.add("toggleBtn--danger");
-    return;
-  }
+  let state = "idle";
+  if (faceSessionStarting) state = "starting";
+  else if (faceSessionStopping) state = "stopping";
+  else if (faceSessionActive) state = "active";
 
-  if (faceSessionStopping) {
-    faceScreenToggle.textContent = "Stopping...";
-    faceScreenToggle.disabled = true;
-    faceScreenToggle.classList.add("toggleBtn--danger");
-    return;
-  }
-
-  if (faceSessionActive) {
-    faceScreenToggle.textContent = "Hide Face";
-    faceScreenToggle.disabled = false;
-    faceScreenToggle.classList.add("toggleBtn--danger");
-  } else {
-    faceScreenToggle.textContent = "Show Face";
-    faceScreenToggle.disabled = false;
-    faceScreenToggle.classList.remove("toggleBtn--danger");
-  }
+  document.body.dataset.faceState = state;
+  faceScreenToggle.disabled = (state === "starting" || state === "stopping");
+  faceScreenToggle.setAttribute(
+    "aria-label",
+    state === "active" || state === "starting" ? "Hide face screen" : "Show face screen"
+  );
 }
 
 function waitForFaceScreenClient(timeoutMs = 10000) {

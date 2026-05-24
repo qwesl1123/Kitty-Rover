@@ -237,9 +237,10 @@ audio {
 .cameraSection:has(img[src]) .cameraStage::before { display: none; }
 .cameraSection:not(:has(img[src])) .cameraStage img { visibility: hidden; }
 
-/* ---- Control row: 2 text toggles + 2 icon toggles ---- */
+/* ---- Control row: 2 text toggles + 3 icon toggles ---- */
 .cameraControls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 14px;
   background: var(--bg-1);
@@ -432,38 +433,23 @@ audio {
 }
 
 
-.faceScreenSection {
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
-  margin-bottom: 24px;
-  background: var(--bg-1);
-  border-top: 1px solid var(--border-1);
-  border-bottom: 1px solid var(--border-1);
-  font-family: var(--sans);
-}
+/* ---- Face screen icon button (lives in the main cameraControls row) ---- */
+.iconBtn--face .iconBtn__svg--on { display: none; }
+.iconBtn--face .iconBtn__svg--off { display: inline-block; }
 
-.faceScreenHeader {
-  padding: 9px 14px 7px;
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--border-1);
-}
+/* When face state is active (or transitioning to active), show the on-face icon */
+body[data-face-state="active"] .iconBtn--face .iconBtn__svg--off,
+body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--off { display: none; }
+body[data-face-state="active"] .iconBtn--face .iconBtn__svg--on,
+body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--on { display: inline-block; }
 
-.faceScreenBody {
-  padding: 10px 14px 12px;
-}
-
-.toggleBtn--face {
-  min-width: 180px;
-  border-color: var(--signal-info);
-  color: var(--signal-info);
-}
-
-.toggleBtn--face.toggleBtn--danger {
+/* Red tint for active and transitioning states — matches "press to stop" affordance */
+body[data-face-state="active"] .iconBtn--face,
+body[data-face-state="starting"] .iconBtn--face,
+body[data-face-state="stopping"] .iconBtn--face {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* ---- Face video floating PiP (FaceTime-style draggable) ---- */
@@ -553,17 +539,6 @@ audio {
   .faceVideoOverlay__line--tail::after {
     animation: none;
     visibility: visible;
-  }
-}
-
-@media (min-width: 760px) {
-  .faceScreenSection {
-    width: auto;
-    position: static;
-    left: auto;
-    margin: 0 0 24px;
-    max-width: 960px;
-    border: 1px solid var(--border-1);
   }
 }
 

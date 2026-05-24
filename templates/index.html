@@ -70,6 +70,23 @@
                 <span class="toggleBtn__label toggleBtn__label--camOff">Start Camera</span>
                 <span class="toggleBtn__label toggleBtn__label--camOn">Stop Camera</span>
             </button>
+            <button id="faceScreenToggle" class="iconBtn iconBtn--face" aria-label="Toggle face screen">
+                <svg class="iconBtn__svg iconBtn__svg--off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="2" y1="2" x2="22" y2="22" />
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                    <line x1="9" y1="9" x2="9.01" y2="9" />
+                    <line x1="15" y1="9" x2="15.01" y2="9" />
+                </svg>
+                <svg class="iconBtn__svg iconBtn__svg--on" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                    <line x1="9" y1="9" x2="9.01" y2="9" />
+                    <line x1="15" y1="9" x2="15.01" y2="9" />
+                </svg>
+            </button>
             <button id="webrtcToggle" class="toggleBtn toggleBtn--audio">
                 <span class="toggleBtn__label toggleBtn__label--audioOff">Link Audio</span>
                 <span class="toggleBtn__label toggleBtn__label--audioOn">Unlink Audio</span>
@@ -143,25 +160,6 @@
             </button>
         </div>
     </section>
-    <section class="faceScreenSection">
-        <header class="faceScreenHeader">
-            <h2 class="srOnly">Face Screen</h2>
-            <span class="sectionLabel">Face Screen</span>
-        </header>
-
-        <div class="faceScreenBody">
-            <button id="faceScreenToggle" class="toggleBtn toggleBtn--face">Show Face</button>
-            <div class="faceVideoContainer" id="faceVideoContainer">
-                <video id="faceVideoPreview" muted playsinline></video>
-                <div class="faceVideoOverlay" aria-hidden="true">
-                    <p id="faceScreenStatus" class="faceVideoOverlay__line">Face Screen: Unknown</p>
-                    <p id="faceScreenClientStatus" class="faceVideoOverlay__line">Face Screen Client: Not Connected</p>
-                    <p id="faceVideoStatus" class="faceVideoOverlay__line faceVideoOverlay__line--tail">Face Video stopped</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <section class="fallbackAudioSection">
         <header class="fallbackAudioHeader">
             <h2 class="srOnly">Fallback Audio</h2>
@@ -195,6 +193,15 @@
         <button class="driveBtn left" data-left="-120" data-right="120">◀</button>
         <button class="driveBtn back" data-left="-160" data-right="-160">▼</button>
         <button class="driveBtn right" data-left="120" data-right="-120">▶</button>
+    </div>
+
+    <div class="faceVideoContainer" id="faceVideoContainer">
+        <video id="faceVideoPreview" muted playsinline></video>
+        <div class="faceVideoOverlay" aria-hidden="true">
+            <p id="faceScreenStatus" class="faceVideoOverlay__line">Face Screen: Unknown</p>
+            <p id="faceScreenClientStatus" class="faceVideoOverlay__line">Face Screen Client: Not Connected</p>
+            <p id="faceVideoStatus" class="faceVideoOverlay__line faceVideoOverlay__line--tail">Face Video stopped</p>
+        </div>
     </div>
 
     <label for="systemSheetToggle" class="systemSheet__backdrop" aria-hidden="true"></label>
