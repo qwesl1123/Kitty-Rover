@@ -506,12 +506,13 @@ audio {
   pointer-events: none;
 }
 
+/* Overlay anchored top-left, CLI log feel */
 .faceVideoOverlay {
   position: absolute;
+  top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  padding: 4px 6px 5px;
+  padding: 5px 6px 4px;
   pointer-events: none;
   font-family: var(--mono);
   font-size: 9px;
@@ -529,6 +530,20 @@ audio {
   overflow: hidden;
   text-overflow: ellipsis;
   color: #000;
+}
+
+/* CLI-style blinking cursor on the last log line */
+.faceVideoOverlay__line--tail::after {
+  content: "_";
+  display: inline-block;
+  margin-left: 1px;
+  animation: cliCursorBlink 1s steps(2, jump-none) infinite;
+}
+
+@keyframes cliCursorBlink {
+  0%   { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 @media (min-width: 760px) {
