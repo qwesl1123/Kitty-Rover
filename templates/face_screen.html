@@ -99,7 +99,8 @@
     let relayViewerConnecting = false;
 
     function setStatus(text) {
-      statusEl.textContent = text;
+      // Strip trailing dots so the blinking cursor doesn't read as "..._".
+      statusEl.textContent = String(text).replace(/\.+$/, "");
     }
 
     if (!socket) {
