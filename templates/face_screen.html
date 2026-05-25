@@ -32,6 +32,21 @@
     }
     body.video-active #faceVideo { opacity: 1; }
     body.video-active .wrap { opacity: 0; pointer-events: none; }
+    body.video-active #catSprite { opacity: 0; }
+
+    /* Transparent cat sprite — top-left, alongside the CLI text.
+       Hidden when the rover face video takes over the screen. */
+    #catSprite {
+      position: fixed;
+      top: 1.5rem;
+      left: clamp(18rem, 28vw, 26rem);
+      width: clamp(80px, 9vw, 140px);
+      height: clamp(80px, 9vw, 140px);
+      pointer-events: none;
+      z-index: 5;
+      opacity: 1;
+      transition: opacity 120ms ease-in-out;
+    }
 
     /* CLI terminal aesthetic — top-left, green phosphor, monospace.
        Larger than real terminal text so it reads from across the room. */
@@ -80,6 +95,7 @@
 </head>
 <body>
   <video id="faceVideo" autoplay muted playsinline></video>
+  <video id="catSprite" src="/static/oiia_cat.webm" autoplay loop muted playsinline></video>
   <main class="wrap" role="main" aria-live="polite">
     <h1>Waiting for phone camera...</h1>
     <p>Rover Face Screen Ready</p>
