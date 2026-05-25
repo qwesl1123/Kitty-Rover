@@ -34,16 +34,14 @@
     body.video-active .wrap { opacity: 0; pointer-events: none; }
     body.video-active #catSprite { opacity: 0; }
 
-    /* Transparent cat sprite — top-left, alongside the CLI text.
+    /* Transparent cat sprite — flows under the CLI text log on the left.
        Hidden when the rover face video takes over the screen. */
     #catSprite {
-      position: fixed;
-      top: 1.5rem;
-      left: clamp(18rem, 28vw, 26rem);
+      display: block;
+      margin-top: 1.25rem;
       width: clamp(80px, 9vw, 140px);
       height: clamp(80px, 9vw, 140px);
       pointer-events: none;
-      z-index: 5;
       opacity: 1;
       transition: opacity 120ms ease-in-out;
     }
@@ -95,11 +93,11 @@
 </head>
 <body>
   <video id="faceVideo" autoplay muted playsinline></video>
-  <video id="catSprite" src="/static/oiia_cat.webm" autoplay loop muted playsinline></video>
   <main class="wrap" role="main" aria-live="polite">
     <h1>Waiting for phone camera...</h1>
     <p>Rover Face Screen Ready</p>
     <p id="faceScreenConnectionStatus">Connecting to rover server</p>
+    <video id="catSprite" src="/static/oiia_cat.webm" autoplay loop muted playsinline></video>
   </main>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
