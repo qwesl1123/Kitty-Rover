@@ -452,6 +452,17 @@ body[data-face-state="stopping"] .iconBtn--face {
   background: rgba(239, 68, 68, 0.08);
 }
 
+/* Suppress the generic iconBtn hover restyling once the face icon is in an
+   active/transition state — without this, hovering pulls color back toward
+   --text-0 and reads as an unwanted dim/desaturation animation. */
+body[data-face-state="active"] .iconBtn--face:hover,
+body[data-face-state="starting"] .iconBtn--face:hover,
+body[data-face-state="stopping"] .iconBtn--face:hover {
+  border-color: var(--signal-stop);
+  color: var(--signal-stop);
+  background: rgba(239, 68, 68, 0.08);
+}
+
 /* ---- Front camera icon button (mirrors iconBtn--face state pattern) ----
    Uses :has(img[src]) on the FRONT cameraSection only — back camera keeps
    its toggleBtn pattern. */
