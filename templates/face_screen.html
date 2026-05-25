@@ -13,15 +13,11 @@
       height: 100%;
       background: #050505;
       color: #f4f4f4;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     body {
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 2rem;
+      padding: 2.5rem 2.5rem;
       overflow: hidden;
     }
     #faceVideo {
@@ -36,30 +32,49 @@
     }
     body.video-active #faceVideo { opacity: 1; }
     body.video-active .wrap { opacity: 0; pointer-events: none; }
-    .wrap { max-width: 900px; }
-    h1 {
-      margin: 0 0 1rem;
-      font-size: clamp(2rem, 5vw, 4rem);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .sub {
-      margin: 0;
-      font-size: clamp(1rem, 2.2vw, 1.6rem);
-      color: #c7c7c7;
-    }
-    .status {
-      margin-top: 1.25rem;
-      font-size: clamp(0.9rem, 1.6vw, 1.1rem);
-      color: #9c9c9c;
-    }
-    .message {
-      margin-top: 2rem;
-      min-height: 3.5rem;
-      font-size: clamp(1.8rem, 4vw, 3.2rem);
-      font-weight: 700;
+
+    /* CLI terminal aesthetic — top-left, green phosphor, monospace.
+       Larger than real terminal text so it reads from across the room. */
+    .wrap {
+      position: relative;
+      max-width: none;
+      text-align: left;
+      color: #33ff33;
+      font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+      line-height: 1.45;
+      font-weight: 500;
       letter-spacing: 0.01em;
-      color: #7dd3fc;
+      text-shadow: 0 0 8px rgba(51, 255, 51, 0.35);
+      transition: opacity 120ms ease-in-out;
+    }
+    .wrap > * {
+      margin: 0;
+      padding: 0;
+      font-size: inherit;
+      font-weight: inherit;
+      color: inherit;
+      letter-spacing: inherit;
+    }
+
+    /* Status line gets the blinking cursor (bulletproof: visibility + step-end,
+       same pattern that survives iOS Low Power Mode throttling). */
+    #faceScreenConnectionStatus::after {
+      content: "_";
+      display: inline-block;
+      margin-left: 0.15em;
+      animation: cliCursorBlink 1.06s step-end infinite;
+    }
+
+    @keyframes cliCursorBlink {
+      from, 49.9% { visibility: visible; }
+      50%, to     { visibility: hidden; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #faceScreenConnectionStatus::after {
+        animation: none;
+        visibility: visible;
+      }
     }
   </style>
 </head>
@@ -67,8 +82,8 @@
   <video id="faceVideo" autoplay muted playsinline></video>
   <main class="wrap" role="main" aria-live="polite">
     <h1>Waiting for phone camera...</h1>
-    <p class="sub">Rover Face Screen Ready</p>
-    <p id="faceScreenConnectionStatus" class="status">Connecting to rover server...</p>
+    <p>Rover Face Screen Ready</p>
+    <p id="faceScreenConnectionStatus">Connecting to rover server</p>
   </main>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
