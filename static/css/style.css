@@ -516,6 +516,9 @@ body[data-face-state="stopping"] .iconBtn--face:hover {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
+  /* Mirror horizontally so the PiP reads like a FaceTime selfie view —
+     the user's left/right matches what they see on screen. */
+  transform: scaleX(-1);
 }
 
 /* Overlay anchored top-left, CLI log feel */
