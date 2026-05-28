@@ -1251,18 +1251,6 @@ if (socket) {
       stopFaceVideo({ notify: true, statusMessage: "Face screen disconnected" });
     }
   });
-
-  socket.on("face_video_status", (payload) => {
-    if (!payload) return;
-    if (payload.ok === false && payload.error) {
-      stopFaceVideoLocally("Face Video stopped");
-      setFaceVideoStatus(String(payload.error), true);
-    }
-  });
-
-  socket.on("face_video_stop", () => {
-    stopFaceVideoLocally("Face Video stopped");
-  });
 }
 
 async function refreshFaceScreenClientStatus() {

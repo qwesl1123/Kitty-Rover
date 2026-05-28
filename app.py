@@ -1,6 +1,8 @@
 from flask import Flask, Response, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
+import os
+
 from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
 from rover.webrtc_audio import close_audio_peer_sync, get_audio_status, handle_audio_offer_sync
@@ -26,6 +28,26 @@ app.config["SECRET_KEY"] = "rover-dev-secret"
 MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+
+@app.context_processor
+def inject_static_version():
+    """Expose static_version(path) to templates.
+
+    Returns the static file's integer mtime so the ?v= cache-bust token
+    changes automatically whenever the file is edited -- no manual version
+    bumping, and cached copies invalidate exactly when the file changes.
+    Falls back to "dev" if the file is missing (e.g. path typo) so a bad
+    lookup can't 500 the page.
+    """
+    def static_version(filename):
+        try:
+            file_path = os.path.join(app.static_folder, filename)
+            return int(os.path.getmtime(file_path))
+        except OSError:
+            return "dev"
+
+    return {"static_version": static_version}
 
 FACE_SCREEN_ROOM = "face_screen"
 face_screen_connected = False
