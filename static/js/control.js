@@ -676,6 +676,55 @@ if (socket) {
   socket.on("drive_status", updateDriveStatus);
 }
 
+// --------------------------------------------------------------------------
+// Single-controller slot
+//
+// On every (re)connect the page claims the controller slot. If another
+// device already holds it we surface a blocking "Rover In Use" overlay with
+// a Take Control button that emits control_steal -- the other device gets
+// control_booted and sees its own overlay. The server enforces this on the
+// drive/stop sockets too, so a broken client cannot bypass the lock.
+// --------------------------------------------------------------------------
+const controlLockOverlay = document.getElementById("controlLockOverlay");
+const controlLockTakeBtn = document.getElementById("controlLockTake");
+
+function showControlLock() {
+  if (!controlLockOverlay) return;
+  controlLockOverlay.hidden = false;
+  controlLockOverlay.setAttribute("aria-hidden", "false");
+  // Halt any in-progress drive immediately on the client side too --
+  // server already ignores us, this just keeps the UI honest.
+  if (typeof stopAllDriveButtons === "function") {
+    stopAllDriveButtons();
+  }
+}
+
+function hideControlLock() {
+  if (!controlLockOverlay) return;
+  controlLockOverlay.hidden = true;
+  controlLockOverlay.setAttribute("aria-hidden", "true");
+}
+
+if (socket) {
+  // (Re)claim the slot on every connect. Socket.IO fires "connect" once
+  // initially and again on each automatic reconnect, so we don't need
+  // separate reconnect handling.
+  socket.on("connect", () => {
+    socket.emit("control_claim");
+  });
+  socket.on("control_granted", hideControlLock);
+  socket.on("control_denied", showControlLock);
+  socket.on("control_booted", showControlLock);
+}
+
+if (controlLockTakeBtn) {
+  controlLockTakeBtn.addEventListener("click", () => {
+    if (socket) {
+      socket.emit("control_steal");
+    }
+  });
+}
+
 function sendDrive(left, right) {
   if (!socket) return;
   socket.emit("drive", { left, right });

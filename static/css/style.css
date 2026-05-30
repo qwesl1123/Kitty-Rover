@@ -1113,3 +1113,104 @@ html:has(.systemSheetToggle:checked) body {
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+/* =========================================================
+   Control-lock overlay — shown when another device holds
+   the controller slot. Full-screen blocking modal styled in
+   the same dark/mono design language as the rest of the UI.
+   ========================================================= */
+.controlLockOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 10, 11, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: controlLockFadeIn 140ms ease-out;
+}
+
+.controlLockOverlay[hidden] { display: none; }
+
+@keyframes controlLockFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.controlLockOverlay__card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 24px 24px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.controlLockOverlay__icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  color: var(--signal-warn);
+}
+
+.controlLockOverlay__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.controlLockOverlay__title {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-0);
+}
+
+.controlLockOverlay__body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-1);
+}
+
+.controlLockOverlay__action {
+  margin-top: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  min-height: 48px;
+  background: transparent;
+  border: 1px solid var(--signal-warn);
+  border-radius: var(--radius-sm);
+  color: var(--signal-warn);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.controlLockOverlay__action:hover {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.controlLockOverlay__action:active {
+  background: rgba(245, 158, 11, 0.22);
+}

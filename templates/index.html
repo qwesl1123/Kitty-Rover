@@ -296,6 +296,22 @@
         </div>
     </aside>
 
+    <div id="controlLockOverlay" class="controlLockOverlay" hidden aria-hidden="true" role="dialog"
+        aria-modal="true" aria-labelledby="controlLockTitle">
+        <div class="controlLockOverlay__card">
+            <div class="controlLockOverlay__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+            </div>
+            <h2 id="controlLockTitle" class="controlLockOverlay__title">Rover In Use</h2>
+            <p class="controlLockOverlay__body">Another device is currently controlling the rover.</p>
+            <button id="controlLockTake" type="button" class="controlLockOverlay__action">Take Control</button>
+        </div>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/control.js') }}?v={{ static_version('js/control.js') }}"></script>
 </body>

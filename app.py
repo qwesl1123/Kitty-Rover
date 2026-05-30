@@ -2,6 +2,7 @@ from flask import Flask, Response, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 import os
+import threading
 
 from rover.camera import camera, back_camera
 from rover.audio import mic_stream, play_audio_file
@@ -52,6 +53,56 @@ def inject_static_version():
 FACE_SCREEN_ROOM = "face_screen"
 face_screen_connected = False
 face_screen_sid = None
+
+
+# --------------------------------------------------------------------------
+# Single-controller slot
+#
+# Only one client at a time is allowed to drive the rover. Identity is the
+# Socket.IO sid. control.js emits "control_claim" on every (re)connect and
+# offers a "Take Control" button that emits "control_steal" to boot whoever
+# currently holds the slot. face_screen.html does NOT emit either event, so
+# the kiosk never participates in the lock.
+#
+# Server enforcement: handle_drive / handle_stop / handle_emergency_stop
+# silently drop messages from non-controllers. The watchdog still halts
+# motors when the controller disconnects, so even a broken client cannot
+# leave the rover driving.
+# --------------------------------------------------------------------------
+controller_lock = threading.Lock()
+active_controller_sid = None
+
+
+def _claim_controller(sid):
+    """Try to claim the control slot. Returns True if granted, False if taken."""
+    global active_controller_sid
+    with controller_lock:
+        if active_controller_sid is None or active_controller_sid == sid:
+            active_controller_sid = sid
+            return True
+        return False
+
+
+def _steal_controller(sid):
+    """Force-take the control slot. Returns the booted sid, or None if no boot was needed."""
+    global active_controller_sid
+    with controller_lock:
+        previous = active_controller_sid
+        active_controller_sid = sid
+        return previous if previous and previous != sid else None
+
+
+def _is_active_controller(sid):
+    with controller_lock:
+        return active_controller_sid is not None and active_controller_sid == sid
+
+
+def _release_controller_if_held(sid):
+    """Free the slot if this sid currently holds it. No-op otherwise."""
+    global active_controller_sid
+    with controller_lock:
+        if active_controller_sid == sid:
+            active_controller_sid = None
 
 
 def emit_face_screen_status(message=None):
@@ -293,6 +344,8 @@ def play_audio():
 
 @socketio.on("drive")
 def handle_drive(data):
+    if not _is_active_controller(request.sid):
+        return
     left = int(data.get("left", 0))
     right = int(data.get("right", 0))
     drive(left, right)
@@ -300,12 +353,34 @@ def handle_drive(data):
 
 @socketio.on("stop")
 def handle_stop():
+    if not _is_active_controller(request.sid):
+        return
     stop()
 
 
 @socketio.on("emergency_stop")
 def handle_emergency_stop():
+    if not _is_active_controller(request.sid):
+        return
     stop()
+
+
+@socketio.on("control_claim")
+def handle_control_claim():
+    """First-come claim. Granted if slot is free or already held by this sid."""
+    if _claim_controller(request.sid):
+        emit("control_granted")
+    else:
+        emit("control_denied")
+
+
+@socketio.on("control_steal")
+def handle_control_steal():
+    """Force-take the slot from whoever holds it and notify the boot-ee."""
+    booted_sid = _steal_controller(request.sid)
+    if booted_sid:
+        socketio.emit("control_booted", to=booted_sid)
+    emit("control_granted")
 
 
 @socketio.on("connect")
@@ -344,6 +419,7 @@ def handle_disconnect():
         face_screen_sid = None
         emit_face_screen_status("Face screen disconnected")
 
+    _release_controller_if_held(request.sid)
     stop()
 
 
