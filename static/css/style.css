@@ -3,24 +3,39 @@
    phases will migrate other panels onto these tokens).
    ========================================================= */
 :root {
-  --bg-0: #0a0a0b;        /* deepest, video stage */
-  --bg-1: #111114;        /* base surface */
-  --bg-2: #18181b;        /* elevated surface */
-  --bg-3: #1f1f23;        /* hover surface */
+  --bg-0: #0a0a0b;
+  /* deepest, video stage */
+  --bg-1: #111114;
+  /* base surface */
+  --bg-2: #18181b;
+  /* elevated surface */
+  --bg-3: #1f1f23;
+  /* hover surface */
 
-  --border-1: #27272a;    /* hairline */
-  --border-2: #3f3f46;    /* control border */
-  --border-3: #52525b;    /* hover border */
+  --border-1: #27272a;
+  /* hairline */
+  --border-2: #3f3f46;
+  /* control border */
+  --border-3: #52525b;
+  /* hover border */
 
-  --text-0: #fafafa;      /* primary */
-  --text-1: #a1a1aa;      /* secondary */
-  --text-2: #71717a;      /* muted */
-  --text-3: #52525b;      /* placeholder */
+  --text-0: #fafafa;
+  /* primary */
+  --text-1: #a1a1aa;
+  /* secondary */
+  --text-2: #71717a;
+  /* muted */
+  --text-3: #52525b;
+  /* placeholder */
 
-  --signal-live: #10b981;   /* green: connected/live */
-  --signal-warn: #f59e0b;   /* amber: caution */
-  --signal-stop: #ef4444;   /* red: stop/danger */
-  --signal-info: #38bdf8;   /* cyan: neutral signal */
+  --signal-live: #10b981;
+  /* green: connected/live */
+  --signal-warn: #f59e0b;
+  /* amber: caution */
+  --signal-stop: #ef4444;
+  /* red: stop/danger */
+  --signal-info: #38bdf8;
+  /* cyan: neutral signal */
 
   --radius-sm: 2px;
   --radius-md: 4px;
@@ -39,7 +54,8 @@ body {
   color: #eee;
   margin: 24px;
   min-height: 100vh;
-  overflow-x: hidden; /* contain full-bleed camera section */
+  overflow-x: hidden;
+  /* contain full-bleed camera section */
 }
 
 .panel {
@@ -155,14 +171,32 @@ audio {
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
-.statusItem__label { white-space: nowrap; }
+.statusItem__label {
+  white-space: nowrap;
+}
 
 /* ---- Status: camera state (driven by any img[src] inside the section) ---- */
-.statusItem__label--camOn { display: none; }
-.statusItem__label--camOff { display: inline; }
-.cameraSection:has(img[src]) .statusItem__label--camOff { display: none; }
-.cameraSection:has(img[src]) .statusItem__label--camOn { display: inline; color: var(--signal-live); }
-.cameraSection:has(img[src]) .statusItem--camera .statusItem__icon { color: var(--signal-live); }
+.statusItem__label--camOn {
+  display: none;
+}
+
+.statusItem__label--camOff {
+  display: inline;
+}
+
+.cameraSection:has(img[src]) .statusItem__label--camOff {
+  display: none;
+}
+
+.cameraSection:has(img[src]) .statusItem__label--camOn {
+  display: inline;
+  color: var(--signal-live);
+}
+
+.cameraSection:has(img[src]) .statusItem--camera .statusItem__icon {
+  color: var(--signal-live);
+}
+
 .cameraSection:has(img[src]) .statusItem--camera .statusItem__dot {
   background: var(--signal-live);
   animation: liveDotPulse 1.8s ease-in-out infinite;
@@ -170,35 +204,64 @@ audio {
 
 /* ---- Status: audio state (driven by data-audio-state) ---- */
 .statusItem__label--audioConnecting,
-.statusItem__label--audioOn { display: none; }
-.statusItem__label--audioOff { display: inline; }
+.statusItem__label--audioOn {
+  display: none;
+}
+
+.statusItem__label--audioOff {
+  display: inline;
+}
 
 .cameraSection[data-audio-state="connecting"] .statusItem__label--audioOff,
-.cameraSection[data-audio-state="connected"] .statusItem__label--audioOff { display: none; }
-.cameraSection[data-audio-state="connecting"] .statusItem__label--audioConnecting { display: inline; color: var(--signal-warn); }
-.cameraSection[data-audio-state="connected"] .statusItem__label--audioOn { display: inline; color: var(--signal-live); }
+.cameraSection[data-audio-state="connected"] .statusItem__label--audioOff {
+  display: none;
+}
 
-.cameraSection[data-audio-state="connecting"] .statusItem--audio .statusItem__icon { color: var(--signal-warn); }
+.cameraSection[data-audio-state="connecting"] .statusItem__label--audioConnecting {
+  display: inline;
+  color: var(--signal-warn);
+}
+
+.cameraSection[data-audio-state="connected"] .statusItem__label--audioOn {
+  display: inline;
+  color: var(--signal-live);
+}
+
+.cameraSection[data-audio-state="connecting"] .statusItem--audio .statusItem__icon {
+  color: var(--signal-warn);
+}
+
 .cameraSection[data-audio-state="connecting"] .statusItem--audio .statusItem__dot {
   background: var(--signal-warn);
   animation: liveDotPulse 1.2s ease-in-out infinite;
 }
-.cameraSection[data-audio-state="connected"] .statusItem--audio .statusItem__icon { color: var(--signal-live); }
+
+.cameraSection[data-audio-state="connected"] .statusItem--audio .statusItem__icon {
+  color: var(--signal-live);
+}
+
 .cameraSection[data-audio-state="connected"] .statusItem--audio .statusItem__dot {
   background: var(--signal-live);
   animation: liveDotPulse 1.8s ease-in-out infinite;
 }
 
 @keyframes liveDotPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
-  50%      { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+  }
 }
 
 /* ---- Video stage ---- */
 .cameraStage {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   background: var(--bg-0);
   overflow: hidden;
   border-top: 1px solid var(--border-1);
@@ -218,13 +281,11 @@ audio {
   color: var(--text-3);
   pointer-events: none;
   background:
-    repeating-linear-gradient(
-      0deg,
+    repeating-linear-gradient(0deg,
       transparent 0px,
       transparent 3px,
       rgba(255, 255, 255, 0.012) 3px,
-      rgba(255, 255, 255, 0.012) 4px
-    );
+      rgba(255, 255, 255, 0.012) 4px);
 }
 
 .cameraStage #video {
@@ -234,8 +295,13 @@ audio {
   display: block;
 }
 
-.cameraSection:has(img[src]) .cameraStage::before { display: none; }
-.cameraSection:not(:has(img[src])) .cameraStage img { visibility: hidden; }
+.cameraSection:has(img[src]) .cameraStage::before {
+  display: none;
+}
+
+.cameraSection:not(:has(img[src])) .cameraStage img {
+  visibility: hidden;
+}
 
 /* ---- Control row: 1 text toggle (audio) + 4 icon toggles (cam, face, listen, talk) ---- */
 .cameraControls {
@@ -270,6 +336,7 @@ audio {
   border-color: var(--signal-live);
   color: var(--signal-live);
 }
+
 .toggleBtn:active {
   background: rgba(16, 185, 129, 0.12);
   border-color: var(--signal-live);
@@ -281,6 +348,7 @@ audio {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
 }
+
 .cameraSection:has(img[src]) .toggleBtn--cam:hover,
 .cameraSection:has(img[src]) .toggleBtn--cam:active {
   background: rgba(239, 68, 68, 0.10);
@@ -294,6 +362,7 @@ audio {
   border-color: var(--signal-stop);
   color: var(--signal-stop);
 }
+
 .cameraSection[data-audio-state="connecting"] .toggleBtn--audio:hover,
 .cameraSection[data-audio-state="connected"] .toggleBtn--audio:hover,
 .cameraSection[data-audio-state="connecting"] .toggleBtn--audio:active,
@@ -304,16 +373,32 @@ audio {
 }
 
 /* Label swap (camera) */
-.toggleBtn__label--camOn { display: none; }
-.cameraSection:has(img[src]) .toggleBtn__label--camOff { display: none; }
-.cameraSection:has(img[src]) .toggleBtn__label--camOn { display: inline; }
+.toggleBtn__label--camOn {
+  display: none;
+}
+
+.cameraSection:has(img[src]) .toggleBtn__label--camOff {
+  display: none;
+}
+
+.cameraSection:has(img[src]) .toggleBtn__label--camOn {
+  display: inline;
+}
 
 /* Label swap (audio): "Link Audio" until connected/connecting */
-.toggleBtn__label--audioOn { display: none; }
+.toggleBtn__label--audioOn {
+  display: none;
+}
+
 .cameraSection[data-audio-state="connecting"] .toggleBtn__label--audioOff,
-.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOff { display: none; }
+.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOff {
+  display: none;
+}
+
 .cameraSection[data-audio-state="connecting"] .toggleBtn__label--audioOn,
-.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOn { display: inline; }
+.cameraSection[data-audio-state="connected"] .toggleBtn__label--audioOn {
+  display: inline;
+}
 
 /* ---- Icon buttons (listen / talk) ---- */
 .iconBtn {
@@ -352,19 +437,36 @@ audio {
 }
 
 /* Icon swap (default to OFF variant; ON variant shown when state is on) */
-.iconBtn__svg--on { display: none; }
-.iconBtn__svg--off { display: inline-block; }
+.iconBtn__svg--on {
+  display: none;
+}
 
-.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--off { display: none; }
-.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--on { display: inline-block; }
+.iconBtn__svg--off {
+  display: inline-block;
+}
+
+.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--off {
+  display: none;
+}
+
+.cameraSection[data-audio-listen="on"] .iconBtn--listen .iconBtn__svg--on {
+  display: inline-block;
+}
+
 .cameraSection[data-audio-listen="on"] .iconBtn--listen {
   border-color: var(--signal-info);
   color: var(--signal-info);
   background: rgba(56, 189, 248, 0.06);
 }
 
-.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--off { display: none; }
-.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--on { display: inline-block; }
+.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--off {
+  display: none;
+}
+
+.cameraSection[data-audio-talk="on"] .iconBtn--talk .iconBtn__svg--on {
+  display: inline-block;
+}
+
 .cameraSection[data-audio-talk="on"] .iconBtn--talk {
   border-color: var(--signal-live);
   color: var(--signal-live);
@@ -373,8 +475,15 @@ audio {
 }
 
 @keyframes talkActivePulse {
-  0%, 100% { box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0); }
-  50%      { box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.22); }
+
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.22);
+  }
 }
 
 /* ---- Audio sink (hidden — element kept in DOM for WebRTC playback) ---- */
@@ -434,14 +543,24 @@ audio {
 
 
 /* ---- Face screen icon button (lives in the main cameraControls row) ---- */
-.iconBtn--face .iconBtn__svg--on { display: none; }
-.iconBtn--face .iconBtn__svg--off { display: inline-block; }
+.iconBtn--face .iconBtn__svg--on {
+  display: none;
+}
+
+.iconBtn--face .iconBtn__svg--off {
+  display: inline-block;
+}
 
 /* When face state is active (or transitioning to active), show the on-face icon */
 body[data-face-state="active"] .iconBtn--face .iconBtn__svg--off,
-body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--off { display: none; }
+body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--off {
+  display: none;
+}
+
 body[data-face-state="active"] .iconBtn--face .iconBtn__svg--on,
-body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--on { display: inline-block; }
+body[data-face-state="starting"] .iconBtn--face .iconBtn__svg--on {
+  display: inline-block;
+}
 
 /* Red tint for active and transitioning states — matches "press to stop" affordance */
 body[data-face-state="active"] .iconBtn--face,
@@ -466,11 +585,21 @@ body[data-face-state="stopping"] .iconBtn--face:hover {
 /* ---- Front camera icon button (mirrors iconBtn--face state pattern) ----
    Uses :has(img[src]) on the FRONT cameraSection only — back camera keeps
    its toggleBtn pattern. */
-.iconBtn--cam .iconBtn__svg--on { display: none; }
-.iconBtn--cam .iconBtn__svg--off { display: inline-block; }
+.iconBtn--cam .iconBtn__svg--on {
+  display: none;
+}
 
-.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--off { display: none; }
-.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--on { display: inline-block; }
+.iconBtn--cam .iconBtn__svg--off {
+  display: inline-block;
+}
+
+.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--off {
+  display: none;
+}
+
+.cameraSection:has(img[src]) .iconBtn--cam .iconBtn__svg--on {
+  display: inline-block;
+}
 
 .cameraSection:has(img[src]) .iconBtn--cam {
   border-color: var(--signal-stop);
@@ -560,8 +689,16 @@ body[data-face-state="stopping"] .iconBtn--face:hover {
 }
 
 @keyframes cliCursorBlink {
-  from, 49.9% { visibility: visible; }
-  50%, to     { visibility: hidden; }
+
+  from,
+  49.9% {
+    visibility: visible;
+  }
+
+  50%,
+  to {
+    visibility: hidden;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -788,12 +925,25 @@ body[data-battery-charging="yes"] .batteryIcon__bolt {
   display: block;
 }
 
-body[data-battery-level="low"] .batteryIcon__fill { background: var(--signal-stop); }
-body[data-battery-level="med"] .batteryIcon__fill { background: var(--signal-warn); }
-body[data-battery-level="ok"] .batteryIcon__fill  { background: var(--signal-live); }
+body[data-battery-level="low"] .batteryIcon__fill {
+  background: var(--signal-stop);
+}
 
-body[data-battery-level="low"] .systemBar__percent { color: var(--signal-stop); }
-body[data-battery-level="med"] .systemBar__percent { color: var(--signal-warn); }
+body[data-battery-level="med"] .batteryIcon__fill {
+  background: var(--signal-warn);
+}
+
+body[data-battery-level="ok"] .batteryIcon__fill {
+  background: var(--signal-live);
+}
+
+body[data-battery-level="low"] .systemBar__percent {
+  color: var(--signal-stop);
+}
+
+body[data-battery-level="med"] .systemBar__percent {
+  color: var(--signal-warn);
+}
 
 /* ---- Backdrop ---- */
 .systemSheet__backdrop {
@@ -807,7 +957,7 @@ body[data-battery-level="med"] .systemBar__percent { color: var(--signal-warn); 
   cursor: pointer;
 }
 
-.systemSheetToggle:checked ~ .systemSheet__backdrop {
+.systemSheetToggle:checked~.systemSheet__backdrop {
   opacity: 1;
   pointer-events: auto;
 }
@@ -832,7 +982,7 @@ body[data-battery-level="med"] .systemBar__percent { color: var(--signal-warn); 
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.systemSheetToggle:checked ~ .systemSheet {
+.systemSheetToggle:checked~.systemSheet {
   transform: translateY(0);
 }
 
@@ -1077,6 +1227,7 @@ html:has(.systemSheetToggle:checked) body {
   grid-column: 2;
   grid-row: 3;
 }
+
 .driveStatusPanel {
   padding-bottom: 20px;
 }
@@ -1133,11 +1284,18 @@ html:has(.systemSheetToggle:checked) body {
   animation: controlLockFadeIn 140ms ease-out;
 }
 
-.controlLockOverlay[hidden] { display: none; }
+.controlLockOverlay[hidden] {
+  display: none;
+}
 
 @keyframes controlLockFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .controlLockOverlay__card {
