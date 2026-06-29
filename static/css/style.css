@@ -1228,6 +1228,31 @@ html:has(.systemSheetToggle:checked) body {
   grid-row: 3;
 }
 
+.gearToggle {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 18px;
+  font-weight: bold;
+  border: 1px solid #555;
+  border-radius: 14px;
+  background: #1b3a2a;            /* green = low (slow/safe) */
+  color: #eee;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gearToggle[data-gear="high"] {
+  background: #3a2a1b;            /* amber = high */
+}
+
 .driveStatusPanel {
   padding-bottom: 20px;
 }

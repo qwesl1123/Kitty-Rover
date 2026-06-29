@@ -16,6 +16,7 @@ from rover.webrtc_face_video import (
     set_publisher_offline_callback,
 )
 from rover.drive import drive, get_drive_status, set_status_callback, start_watchdog, stop
+from rover import serial_link
 from rover.system_control import (
     face_screen_start,
     face_screen_stop,
@@ -129,6 +130,9 @@ def emit_face_video_publisher_offline():
 set_status_callback(emit_drive_status)
 set_publisher_offline_callback(emit_face_video_publisher_offline)
 start_watchdog(socketio.start_background_task, socketio.sleep)
+
+# Stream drive state to the ESP32 motor controller over USB serial.
+serial_link.start()
 
 
 @app.route("/")

@@ -725,10 +725,40 @@ if (controlLockTakeBtn) {
   });
 }
 
-function sendDrive(left, right) {
+// --- gear: scales the d-pad's authored magnitudes (forward 180 == HIGH) ---
+const GEAR_HIGH = 180;
+const GEAR_LOW = 80;
+const MIN_PWM = 70;            // floor so low-gear turns clear the stall point
+const gearToggle = document.getElementById("gearToggle");
+let currentGear = "low";
+let gearScale = GEAR_LOW / GEAR_HIGH;
+
+function applyGear(gear) {
+  currentGear = gear;
+  gearScale = gear === "high" ? 1 : GEAR_LOW / GEAR_HIGH;
+  if (gearToggle) {
+    gearToggle.textContent = gear === "high" ? "HI" : "LO";
+    gearToggle.dataset.gear = gear;
+  }
+}
+
+function withFloor(v) {
+  if (v === 0) return 0;
+  return Math.sign(v) * Math.min(255, Math.max(MIN_PWM, Math.abs(v)));
+}
+
+function sendDrive(baseLeft, baseRight) {
   if (!socket) return;
+  const left = withFloor(Math.round(baseLeft * gearScale));
+  const right = withFloor(Math.round(baseRight * gearScale));
   socket.emit("drive", { left, right });
 }
+
+if (gearToggle) {
+  gearToggle.addEventListener("click", () =>
+    applyGear(currentGear === "high" ? "low" : "high"));
+}
+applyGear("low");   // default to LOW for first hardware test
 
 function sendStop() {
   if (!socket) return;
