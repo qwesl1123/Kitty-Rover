@@ -161,6 +161,39 @@ def back_video_feed():
     )
 
 
+@app.route("/camera/front/start", methods=["POST"])
+def camera_front_start():
+    camera.start()
+    return jsonify({"ok": True, "active": camera.is_active})
+
+
+@app.route("/camera/front/stop", methods=["POST"])
+def camera_front_stop():
+    camera.stop()
+    return jsonify({"ok": True, "active": False})
+
+
+@app.route("/camera/back/start", methods=["POST"])
+def camera_back_start():
+    back_camera.start()
+    return jsonify({"ok": True, "active": back_camera.is_active})
+
+
+@app.route("/camera/back/stop", methods=["POST"])
+def camera_back_stop():
+    back_camera.stop()
+    return jsonify({"ok": True, "active": False})
+
+
+@app.route("/camera/status")
+def camera_status():
+    return jsonify({
+        "ok": True,
+        "front": {"active": camera.is_active},
+        "back": {"active": back_camera.is_active},
+    })
+
+
 @app.route("/mic_feed")
 def mic_feed():
     return Response(

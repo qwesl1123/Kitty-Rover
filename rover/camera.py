@@ -81,6 +81,15 @@ _READER_JOIN_TIMEOUT_S = 2.0
 # trying again. Keeps the reader from busy-looping on a flaky camera.
 _READ_FAILURE_RETRY_S = 0.1
 
+# Number of frames to read and discard after opening the camera to let the
+# sensor auto-exposure settle.  USB cameras commonly produce 1-5 black frames
+# immediately after open.
+_WARMUP_FRAMES = 5
+
+# Minimum mean pixel brightness (0-255) for a frame to count as non-black
+# during the warmup phase.
+_WARMUP_MIN_BRIGHTNESS = 10
+
 
 class FrameBroker:
     """One-producer, many-consumer broker for an OpenCV capture device.
@@ -104,9 +113,11 @@ class FrameBroker:
 
         self._subscribers = 0
         self._should_run = False
+        self._explicitly_stopped = False
         self._reader_thread: Optional[threading.Thread] = None
         self._latest_jpeg: Optional[bytes] = None
         self._frame_seq = 0
+        self._warmup_event = threading.Event()
 
     # ------------------------------------------------------------------
     # Public API
@@ -121,6 +132,7 @@ class FrameBroker:
         client closes the connection mid-yield (BrokenPipeError).
         """
         self._subscribe()
+        self._warmup_event.wait(timeout=2.0)
         last_seen = 0
         try:
             while True:
@@ -150,12 +162,54 @@ class FrameBroker:
         finally:
             self._unsubscribe()
 
+    def stop(self):
+        """Explicitly stop the reader and release the camera.
+
+        Idempotent.  Forces _should_run False and wakes all waiters
+        regardless of subscriber count so the reader exits and calls
+        cap.release() in its finally block.  Only acquires _state_lock
+        (never _start_lock) so it completes instantly and cannot deadlock
+        with _ensure_reader.
+        """
+        with self._frame_cond:
+            if not self._should_run:
+                return
+            self._explicitly_stopped = True
+            self._should_run = False
+            self._subscribers = 0
+            self._frame_cond.notify_all()
+        print(f"[{self._label}] explicit stop() called; reader will exit", flush=True)
+
+    def start(self):
+        """Explicitly start the reader, clearing any previous stop.
+
+        Idempotent if the reader is already healthy.  This does NOT add a
+        subscriber — the reader runs but produces no MJPEG output until a
+        subscriber connects via stream().  Use it to pre-warm the camera
+        so the first stream() subscriber gets frames immediately.
+        """
+        with self._state_lock:
+            self._explicitly_stopped = False
+        self._warmup_event.clear()
+        self._ensure_reader()
+
+    @property
+    def is_active(self):
+        """Whether the reader is running."""
+        with self._state_lock:
+            return (
+                self._should_run
+                and self._reader_thread is not None
+                and self._reader_thread.is_alive()
+            )
+
     # ------------------------------------------------------------------
     # Subscription bookkeeping
     # ------------------------------------------------------------------
 
     def _subscribe(self):
         with self._state_lock:
+            self._explicitly_stopped = False
             self._subscribers += 1
             count = self._subscribers
         print(f"[{self._label}] subscriber added (now {count})", flush=True)
@@ -210,6 +264,7 @@ class FrameBroker:
                         flush=True,
                     )
 
+            self._warmup_event.clear()
             with self._state_lock:
                 self._should_run = True
                 self._latest_jpeg = None
@@ -236,9 +291,43 @@ class FrameBroker:
             with self._frame_cond:
                 self._should_run = False
                 self._frame_cond.notify_all()
+            self._warmup_event.set()
             return
 
         delay = 1.0 / self._fps if self._fps > 0 else 0.0
+
+        # --- Warmup: discard initial black frames from USB cameras ---
+        warmup_done = False
+        for _ in range(_WARMUP_FRAMES):
+            with self._state_lock:
+                if not self._should_run:
+                    break
+            ok, frame = cap.read()
+            if not ok:
+                time.sleep(_READ_FAILURE_RETRY_S)
+                continue
+            if frame.mean() >= _WARMUP_MIN_BRIGHTNESS:
+                ok_enc, jpeg = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), self._jpeg_quality],
+                )
+                if ok_enc:
+                    with self._frame_cond:
+                        self._latest_jpeg = jpeg.tobytes()
+                        self._frame_seq += 1
+                        self._frame_cond.notify_all()
+                warmup_done = True
+                break
+
+        self._warmup_event.set()
+        if not warmup_done:
+            print(
+                f"[{self._label}] warmup: no bright frame in "
+                f"{_WARMUP_FRAMES} reads",
+                flush=True,
+            )
+
         try:
             while True:
                 with self._state_lock:
@@ -270,6 +359,7 @@ class FrameBroker:
             with self._frame_cond:
                 self._should_run = False
                 self._frame_cond.notify_all()
+            self._warmup_event.clear()
             print(f"[{self._label}] reader thread exited; camera released", flush=True)
 
     def _open_capture(self):

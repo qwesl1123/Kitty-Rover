@@ -11,24 +11,39 @@ const cameraSection = document.querySelector(".cameraSection");
 const backCamToggle = document.getElementById("backCamToggle");
 const backVideo = document.getElementById("backVideo");
 
-camToggle.addEventListener("click", () => {
+camToggle.addEventListener("click", async () => {
   if (video.hasAttribute("src")) {
     video.removeAttribute("src");
     camToggle.setAttribute("aria-label", "Start camera");
+    fetch("/camera/front/stop", { method: "POST", keepalive: true }).catch(() => {});
   } else {
-    video.src = "/video_feed?t=" + Date.now();
     camToggle.setAttribute("aria-label", "Stop camera");
+    try { await fetch("/camera/front/start", { method: "POST" }); } catch (err) { /* best-effort */ }
+    video.src = "/video_feed?t=" + Date.now();
   }
 });
 
 if (backCamToggle && backVideo) {
-  backCamToggle.addEventListener("click", () => {
+  backCamToggle.addEventListener("click", async () => {
     if (backVideo.hasAttribute("src")) {
       backVideo.removeAttribute("src");
+      fetch("/camera/back/stop", { method: "POST", keepalive: true }).catch(() => {});
     } else {
+      try { await fetch("/camera/back/start", { method: "POST" }); } catch (err) { /* best-effort */ }
       backVideo.src = "/back_video_feed?t=" + Date.now();
     }
   });
+}
+
+function stopAllCameras() {
+  if (video && video.hasAttribute("src")) {
+    video.removeAttribute("src");
+    fetch("/camera/front/stop", { method: "POST", keepalive: true }).catch(() => {});
+  }
+  if (backVideo && backVideo.hasAttribute("src")) {
+    backVideo.removeAttribute("src");
+    fetch("/camera/back/stop", { method: "POST", keepalive: true }).catch(() => {});
+  }
 }
 
 // Audio
@@ -650,9 +665,11 @@ webrtcListenToggle.addEventListener("click", () => setWebrtcListen(!webrtcListen
 
 window.addEventListener("pagehide", () => {
   closeWebrtcAudio({ statusMessage: "Disconnected" });
+  stopAllCameras();
 });
 window.addEventListener("beforeunload", () => {
   closeWebrtcAudio({ statusMessage: "Disconnected" });
+  stopAllCameras();
 });
 
 updateWebrtcButtons();
@@ -819,6 +836,7 @@ document.addEventListener("visibilitychange", () => {
     cancelVoiceClip("visibility hidden");
     stopAllDriveButtons();
     sendStop();
+    stopAllCameras();
   }
 });
 
