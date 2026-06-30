@@ -330,6 +330,8 @@ class FrameBroker:
 
         try:
             while True:
+                loop_start = time.monotonic()
+
                 with self._state_lock:
                     if not self._should_run:
                         break
@@ -352,8 +354,14 @@ class FrameBroker:
                     self._frame_seq += 1
                     self._frame_cond.notify_all()
 
+                # Adaptive pacing: sleep only the remainder of the target frame
+                # interval after capture+encode, never a full interval on top of
+                # the work already done (which would cap FPS below target and
+                # penalize heavier high-resolution frames the most).
                 if delay > 0:
-                    time.sleep(delay)
+                    remaining = delay - (time.monotonic() - loop_start)
+                    if remaining > 0:
+                        time.sleep(remaining)
         finally:
             cap.release()
             with self._frame_cond:
@@ -364,14 +372,40 @@ class FrameBroker:
 
     def _open_capture(self):
         print(f"[{self._label}] opening camera on {self._device}", flush=True)
-        cap = cv2.VideoCapture(self._device)
+        # Explicit V4L2 backend so the property sets below are honored by the
+        # USB-camera driver rather than a fallback backend.
+        cap = cv2.VideoCapture(self._device, cv2.CAP_V4L2)
+
+        # Request MJPG *before* width/height/fps. Without a compressed format
+        # V4L2 defaults to raw YUYV, whose USB bandwidth saturates the bus at
+        # higher resolutions (e.g. 960x540) and throttles the frame rate to a
+        # few FPS. MJPG lets the camera compress on-sensor (~10x less
+        # bandwidth) so the configured FPS is achievable. Driver order matters:
+        # FOURCC must be set first or many drivers ignore it.
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
         cap.set(cv2.CAP_PROP_FPS, self._fps)
+        # Keep only the freshest frame so cap.read() never returns a backlog.
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
         if not cap.isOpened():
             cap.release()
             print(f"[{self._label}] failed to open camera on {self._device}", flush=True)
             return None
+
+        # Log what the driver actually negotiated so a wrong format (e.g. MJPG
+        # rejected -> YUYV) or throttled FPS is obvious in the server log.
+        fourcc_int = int(cap.get(cv2.CAP_PROP_FOURCC))
+        fourcc = "".join(chr((fourcc_int >> (8 * i)) & 0xFF) for i in range(4))
+        actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        actual_fps = cap.get(cv2.CAP_PROP_FPS)
+        print(
+            f"[{self._label}] capture negotiated: "
+            f"{fourcc!r} {actual_w}x{actual_h} @ {actual_fps:g} fps",
+            flush=True,
+        )
         return cap
 
 
