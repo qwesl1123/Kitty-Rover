@@ -2,8 +2,9 @@
 
 A browser-driven, teleoperated rover you can drive from anywhere. Point a phone or
 laptop at the rover's web page and you get a live view from two cameras, two-way
-audio, and a D-pad to drive it around. The rover can even show an animated **cat
-face** on an onboard screen and relay your face to it over video.
+audio, and a D-pad to drive it around. The rover also has a screen on it that works
+like **FaceTime**: your phone's camera shows up live on the rover, so people near it
+see and hear you.
 
 Everything the operator sees and touches runs in a normal web browser — no app to
 install.
@@ -48,8 +49,9 @@ which in turn drives the motors:
 - **Two-way realtime audio** over WebRTC (listen to the rover's mic and talk back
   through its speaker), plus a lightweight MP3 mic stream and one-tap **voice-clip
   playback**.
-- **Animated face screen** — an onboard kiosk display shows a cat animation, and a
-  phone can publish its camera so the rover "wears" your face (relayed via WebRTC).
+- **FaceTime-style screen** — the rover has a display that shows your phone's camera
+  live (over WebRTC), so people near the rover can see and talk to you. When no one
+  is calling, it just shows a funny idle cat.
 - **System telemetry panel** — battery, CPU temperature, CPU / RAM / disk usage,
   network interfaces, and Tailscale address.
 - **Single-controller lock** — only one browser can drive at a time; others can
@@ -98,7 +100,7 @@ Kitty-Rover
 | Battery pack | Powers the motors / IBT-2 boards |
 | Cameras | Front and back views (this build uses the laptop's **built-in camera** for the front feed; add a USB camera for the back) |
 | Mic + speaker | Two-way audio (this build uses the laptop's **built-in mic and speaker**) |
-| Small HDMI screen *(optional)* | The animated "face" kiosk |
+| Small HDMI screen *(optional)* | The FaceTime-style display on the rover |
 
 ### Signal chain
 
@@ -199,12 +201,12 @@ Open `http://<rover-ip>:5000/` (the **operator page**):
 - **Cameras** — toggle the front and back video feeds on/off.
 - **Audio** — *Listen* to the rover's mic, *Talk* back through its speaker, or send
   a short recorded **voice clip**.
-- **Face screen** — start/stop the onboard kiosk and publish your phone's camera to
-  it.
+- **Screen (FaceTime)** — turn the rover's display on/off and share your phone's
+  camera to it so people near the rover can see you.
 - **System panel** — battery, temperature, resource usage, and network info.
 
-`http://<rover-ip>:5000/face-screen` is the **kiosk page** shown on the rover's own
-display (a cat animation by default; your face when a phone is publishing).
+`http://<rover-ip>:5000/face-screen` is the page shown on the rover's own display —
+it shows your phone's camera when you're on a call, and an idle cat otherwise.
 
 ---
 
