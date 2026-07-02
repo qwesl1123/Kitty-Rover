@@ -96,8 +96,8 @@ Kitty-Rover
 | 2 × IBT-2 (BTS7960) H-bridge | High-current motor drivers (one per side) |
 | 2 × MG540 gearmotor | Left and right drive motors |
 | Battery pack | Powers the motors / IBT-2 boards |
-| 2 × USB cameras | Front and back views |
-| USB mic + speaker | Two-way audio |
+| Cameras | Front and back views (this build uses the laptop's **built-in camera** for the front feed; add a USB camera for the back) |
+| Mic + speaker | Two-way audio (this build uses the laptop's **built-in mic and speaker**) |
 | Small HDMI screen *(optional)* | The animated "face" kiosk |
 
 ### Signal chain
