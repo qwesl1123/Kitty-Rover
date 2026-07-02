@@ -100,7 +100,6 @@ Kitty-Rover
 | Battery pack | Powers the motors / IBT-2 boards |
 | Cameras | Front and back views (this build uses the laptop's **built-in camera** for the front feed; add a USB camera for the back) |
 | Mic + speaker | Two-way audio (this build uses the laptop's **built-in mic and speaker**) |
-| Small HDMI screen *(optional)* | The FaceTime-style display on the rover |
 
 ### Signal chain
 
