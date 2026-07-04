@@ -58,6 +58,25 @@ body {
   /* contain full-bleed camera section */
 }
 
+/* iOS: stop tap-then-hold on the control pad from selecting the whole
+   page. Buttons are already non-selectable, so Safari's selection gesture
+   walks up to <body>; disable it globally and re-enable only where the
+   user genuinely needs to select/edit text. */
+html,
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .panel {
   border: 1px solid #333;
   padding: 16px;
