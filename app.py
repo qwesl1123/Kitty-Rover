@@ -29,7 +29,13 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "rover-dev-secret"
 MAX_AUDIO_UPLOAD_BYTES = 5 * 1024 * 1024
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    ping_interval=10,
+    ping_timeout=5,
+)
 
 
 @app.context_processor
@@ -99,11 +105,13 @@ def _is_active_controller(sid):
 
 
 def _release_controller_if_held(sid):
-    """Free the slot if this sid currently holds it. No-op otherwise."""
+    """Free the slot if this sid currently holds it. Returns True if released."""
     global active_controller_sid
     with controller_lock:
         if active_controller_sid == sid:
             active_controller_sid = None
+            return True
+    return False
 
 
 def emit_face_screen_status(message=None):
@@ -215,6 +223,20 @@ def webrtc_audio_offer():
         return jsonify({"ok": False, "error": str(err)}), 500
 
     return jsonify(answer)
+
+
+@app.route("/control/release", methods=["POST"])
+def control_release():
+    """Release the control slot on tab close/navigation (fetch keepalive from pagehide)."""
+    data = request.get_json(silent=True) or {}
+    sid = data.get("sid")
+
+    released = _release_controller_if_held(sid) if sid else False
+    if released:
+        stop()
+        socketio.emit("control_available")
+
+    return jsonify({"ok": True, "released": released})
 
 
 @app.route("/webrtc/audio/close", methods=["POST"])
@@ -456,7 +478,8 @@ def handle_disconnect():
         face_screen_sid = None
         emit_face_screen_status("Face screen disconnected")
 
-    _release_controller_if_held(request.sid)
+    if _release_controller_if_held(request.sid):
+        socketio.emit("control_available")
     stop()
 
 

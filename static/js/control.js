@@ -722,6 +722,16 @@ function hideControlLock() {
   controlLockOverlay.setAttribute("aria-hidden", "true");
 }
 
+function releaseControlLock() {
+  if (!socket || !socket.id) return;
+  fetch("/control/release", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sid: socket.id }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 if (socket) {
   // (Re)claim the slot on every connect. Socket.IO fires "connect" once
   // initially and again on each automatic reconnect, so we don't need
@@ -732,7 +742,14 @@ if (socket) {
   socket.on("control_granted", hideControlLock);
   socket.on("control_denied", showControlLock);
   socket.on("control_booted", showControlLock);
+  // Another client released the slot (clean close or timeout) -- retry.
+  socket.on("control_available", () => {
+    socket.emit("control_claim");
+  });
 }
+
+window.addEventListener("pagehide", () => releaseControlLock());
+window.addEventListener("beforeunload", () => releaseControlLock());
 
 if (controlLockTakeBtn) {
   controlLockTakeBtn.addEventListener("click", () => {
