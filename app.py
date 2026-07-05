@@ -478,9 +478,10 @@ def handle_disconnect():
         face_screen_sid = None
         emit_face_screen_status("Face screen disconnected")
 
-    if _release_controller_if_held(request.sid):
+    released = _release_controller_if_held(request.sid)
+    if released:
+        stop()
         socketio.emit("control_available", skip_sid=request.sid)
-    stop()
 
 
 if __name__ == "__main__":
