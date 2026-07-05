@@ -234,7 +234,7 @@ def control_release():
     released = _release_controller_if_held(sid) if sid else False
     if released:
         stop()
-        socketio.emit("control_available")
+        socketio.emit("control_available", skip_sid=sid)
 
     return jsonify({"ok": True, "released": released})
 
@@ -479,7 +479,7 @@ def handle_disconnect():
         emit_face_screen_status("Face screen disconnected")
 
     if _release_controller_if_held(request.sid):
-        socketio.emit("control_available")
+        socketio.emit("control_available", skip_sid=request.sid)
     stop()
 
 

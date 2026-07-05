@@ -722,8 +722,14 @@ function hideControlLock() {
   controlLockOverlay.setAttribute("aria-hidden", "true");
 }
 
+// Set only while tearing down via releaseControlLock(), so a
+// "control_available" event that slips in before the socket actually closes
+// doesn't make this tab reclaim the slot it just gave up.
+let controlReleasing = false;
+
 function releaseControlLock() {
   if (!socket || !socket.id) return;
+  controlReleasing = true;
   fetch("/control/release", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -744,6 +750,7 @@ if (socket) {
   socket.on("control_booted", showControlLock);
   // Another client released the slot (clean close or timeout) -- retry.
   socket.on("control_available", () => {
+    if (controlReleasing) return;
     socket.emit("control_claim");
   });
 }
